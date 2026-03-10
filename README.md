@@ -21,13 +21,11 @@
 
 3. **Create the `claude-review` label** — Go to **Issues → Labels → New label** and create a label named `claude-review`. This is the trigger — adding it to a PR starts the review. (You can customize the label name via the `review-label` input, but your workflow's `if:` condition must match.)
 
-4. **Private action repo access** (if this action repo is private) — Go to the action repo's **Settings → Actions → General → Access** and select "Accessible from repositories in the organization". Without this, other repos in the org can't reference the action.
-
 ### Optional
 
-5. **Review guide** — Create a `.github/claude-review-guide.md` file in your repo with your team's review standards. See the [example template](examples/claude-review-guide.md). The action fetches this file from your default branch and injects it into the review prompt.
+4. **Review guide** — Create a `.github/claude-review-guide.md` file in your repo with your team's review standards. See the [example template](examples/claude-review-guide.md). The action fetches this file from your default branch and injects it into the review prompt.
 
-6. **GitHub Actions permissions** — If your org restricts Actions permissions, ensure the workflow has access to the permissions listed in [Required Permissions](#required-permissions) below.
+5. **GitHub Actions permissions** — If your org restricts Actions permissions, ensure the workflow has access to the permissions listed in [Required Permissions](#required-permissions) below.
 
 ### Add the workflow
 
@@ -192,8 +190,8 @@ report-cost.sh       → Append cost/turns/model to review body
 | Level | Can block? | Can approve? | Behavior |
 |-------|-----------|-------------|----------|
 | `comment-only` | No | No | Always posts as COMMENT. Advisory only — never blocks PRs. |
-| `request-changes` | Yes | Yes | REQUEST_CHANGES for blockers/high, COMMENT for medium, APPROVE for clean. **Default.** |
-| `full` | Yes | Yes (guarded) | Like `request-changes`, but approval is gated by `approve-threshold` (severity cutoff) and `approve-max-files` (PR size limit). |
+| `request-changes` | Yes | No | REQUEST_CHANGES for blockers/high, COMMENT for everything else. **Default.** |
+| `full` | Yes | Yes (guarded) | Like `request-changes`, plus can APPROVE clean PRs — gated by `approve-threshold` (severity cutoff) and `approve-max-files` (PR size limit). |
 
 ## Re-review Reconciliation
 

@@ -150,10 +150,9 @@ AUTH_COMMENT
 SUBMITTING THE REVIEW:
 If your review has 🔴 BLOCKERS or 🟠 HIGH findings, use REQUEST_CHANGES:
   gh api repos/$REPO/pulls/$PR_NUMBER/reviews --method POST -f event=REQUEST_CHANGES -f body="your review"
-If your review has 🟡 MEDIUM findings (but no blockers/high), use COMMENT:
+Otherwise (clean, or only 🟡 MEDIUM / 🔵 LOW findings), use COMMENT:
   gh api repos/$REPO/pulls/$PR_NUMBER/reviews --method POST -f event=COMMENT -f body="your review"
-If your review has NO blockers, high, or medium findings (only 🔵 LOW/NITS or clean), use APPROVE:
-  gh api repos/$REPO/pulls/$PR_NUMBER/reviews --method POST -f event=APPROVE -f body="your review"
+Do NOT use APPROVE — this authority level cannot approve PRs.
 AUTH_RC
     ;;
   full)
