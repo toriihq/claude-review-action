@@ -17,15 +17,17 @@
    - Name: `ANTHROPIC_API_KEY`
    - Value: your `sk-ant-...` key
 
-2. **Claude GitHub App** — The action uses [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) under the hood, which requires the Claude GitHub App installed on your repo. Follow the [claude-code-action setup instructions](https://github.com/anthropics/claude-code-action#setup) to install it. This gives `claude[bot]` permission to post reviews and comments.
+2. **Claude GitHub App** — The action uses [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) under the hood. You must install the Claude GitHub App on your repo (run `/install-github-app` in Claude Code, or follow the [claude-code-action setup](https://github.com/anthropics/claude-code-action#setup)). This is **required** — without it, reviews post as `github-actions[bot]` instead of `claude[bot]`, and re-review detection, review dismissal, and cost tracking all break.
 
 3. **Create the `claude-review` label** — Go to **Issues → Labels → New label** and create a label named `claude-review`. This is the trigger — adding it to a PR starts the review. (You can customize the label name via the `review-label` input, but your workflow's `if:` condition must match.)
 
+4. **Private action repo access** (if this action repo is private) — Go to the action repo's **Settings → Actions → General → Access** and select "Accessible from repositories in the organization". Without this, other repos in the org can't reference the action.
+
 ### Optional
 
-4. **Review guide** — Create a `.github/claude-review-guide.md` file in your repo with your team's review standards. See the [example template](examples/claude-review-guide.md). The action fetches this file from your default branch and injects it into the review prompt.
+5. **Review guide** — Create a `.github/claude-review-guide.md` file in your repo with your team's review standards. See the [example template](examples/claude-review-guide.md). The action fetches this file from your default branch and injects it into the review prompt.
 
-5. **GitHub Actions permissions** — If your org restricts Actions permissions, ensure the workflow has access to the permissions listed in [Required Permissions](#required-permissions) below.
+6. **GitHub Actions permissions** — If your org restricts Actions permissions, ensure the workflow has access to the permissions listed in [Required Permissions](#required-permissions) below.
 
 ### Add the workflow
 
@@ -187,11 +189,11 @@ report-cost.sh       → Append cost/turns/model to review body
 
 ## Review Authority Levels
 
-| Level | Behavior |
-|-------|----------|
-| `comment-only` | Always posts as COMMENT. Advisory only — never blocks PRs. |
-| `request-changes` | Posts REQUEST_CHANGES for blockers/high findings, COMMENT for medium, APPROVE for clean. **Default.** |
-| `full` | Like `request-changes` but with configurable auto-approve: respects `approve-threshold` and `approve-max-files`. |
+| Level | Can block? | Can approve? | Behavior |
+|-------|-----------|-------------|----------|
+| `comment-only` | No | No | Always posts as COMMENT. Advisory only — never blocks PRs. |
+| `request-changes` | Yes | Yes | REQUEST_CHANGES for blockers/high, COMMENT for medium, APPROVE for clean. **Default.** |
+| `full` | Yes | Yes (guarded) | Like `request-changes`, but approval is gated by `approve-threshold` (severity cutoff) and `approve-max-files` (PR size limit). |
 
 ## Re-review Reconciliation
 
@@ -225,13 +227,12 @@ If you have an existing 500+ line Claude review workflow:
 
 ## Contributing
 
-Contributions are welcome! This is a pure bash + markdown project — no build step required.
+This is a pure bash + markdown project — no build step required.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test by pointing a workflow at your fork: `uses: your-user/claude-review-action@your-branch`
-5. Open a pull request
+1. Create a feature branch
+2. Make your changes
+3. Test by pointing a workflow at your branch: `uses: toriihq/claude-review-action@your-branch`
+4. Open a pull request
 
 ## License
 
