@@ -222,16 +222,6 @@ If you have an existing 500+ line Claude review workflow:
 2. **Failure type detection** — The action reliably detects `max_turns` failures. API error subtypes (401 vs 429) may not be distinguishable and fall back to a generic message.
 
 
-## Contributing
-
-Contributions are welcome! This is a pure bash + markdown project — no build step required.
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test by pointing a workflow at your fork: `uses: your-user/claude-review-action@your-branch`
-5. Open a pull request
-
 ## License
 
 [MIT](LICENSE)
