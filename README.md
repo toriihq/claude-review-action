@@ -96,6 +96,14 @@ For detailed review standards, create `.github/claude-review-guide.md` in your r
 
 A good review guide covers security checklists, testing expectations, code style, architecture rules, and domain-specific patterns. See the [example template](examples/claude-review-guide.md).
 
+### Bonus: `CLAUDE.md` — your repo's built-in knowledge
+
+If your repo has a `CLAUDE.md` file at the root, Claude automatically reads it during every review. This is a built-in Claude Code behavior — no configuration needed.
+
+This means conventions you've already documented for Claude Code (architecture decisions, naming patterns, database conventions, common gotchas) also inform code reviews. Teams with a well-maintained `CLAUDE.md` see noticeably better reviews because Claude understands the project's context beyond just the diff.
+
+**You don't need a `CLAUDE.md` to use this action** — it works great without one. But if you already have one, the reviews get better for free.
+
 ---
 
 ## Want `@claude` in comments too?
