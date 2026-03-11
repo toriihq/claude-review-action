@@ -104,6 +104,12 @@ This means conventions you've already documented for Claude Code (architecture d
 
 **You don't need a `CLAUDE.md` to use this action** — it works great without one. But if you already have one, reviews get better automatically. Note that a larger `CLAUDE.md` means more tokens per review — keep it focused on conventions and patterns that matter for code quality.
 
+**`CLAUDE.md` vs review guide — what goes where?**
+- **`CLAUDE.md`** = domain knowledge (project structure, naming conventions, database patterns, tech stack). Tells Claude *what the codebase looks like*.
+- **Review guide** = review behavior (severity format, security checklist, testing expectations, scope validation). Tells Claude *how to judge the code*.
+
+They complement each other — don't duplicate content between them. If your `CLAUDE.md` already documents that all DB queries use `idOrg`, the review guide just needs to say "flag missing `idOrg` as a BLOCKER."
+
 ---
 
 ## Want `@claude` in comments too?
