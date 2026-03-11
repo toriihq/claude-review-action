@@ -102,7 +102,7 @@ If your repo has a `CLAUDE.md` file at the root, Claude automatically reads it d
 
 This means conventions you've already documented for Claude Code (architecture decisions, naming patterns, database conventions, common gotchas) also inform code reviews. Teams with a well-maintained `CLAUDE.md` see noticeably better reviews because Claude understands the project's context beyond just the diff.
 
-**You don't need a `CLAUDE.md` to use this action** — it works great without one. But if you already have one, the reviews get better for free.
+**You don't need a `CLAUDE.md` to use this action** — it works great without one. But if you already have one, reviews get better automatically. Note that a larger `CLAUDE.md` means more tokens per review — keep it focused on conventions and patterns that matter for code quality.
 
 ---
 
