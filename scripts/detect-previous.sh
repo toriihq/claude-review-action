@@ -39,24 +39,52 @@ fi
 echo "has_previous=true" >> "$GITHUB_OUTPUT"
 echo "last_review_date=$LAST_REVIEW_DATE" >> "$GITHUB_OUTPUT"
 
-# --- Calculate new commits since last review ---
-BASE_BRANCH=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json baseRefName --jq '.baseRefName')
-git fetch origin "$BASE_BRANCH" --depth=1
+# --- Detect new commits: SHA comparison (pagination-proof) ---
+# The reviews API commit_id tells us which SHA the review was submitted on.
+# Comparing against the current HEAD avoids the `gh pr view --json commits`
+# pagination limit (default first:100) which silently drops newer commits on
+# large PRs. See: https://github.com/toriihq/claude-review-action/pull/2
+CURRENT_HEAD=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid')
+LAST_REVIEW_COMMIT=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+  --jq '[.[] | select(.user.login == "claude[bot]" and (.body | test("Verdict"))) | .commit_id] | last // empty')
 
-NEW_SHAS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json commits \
-  --jq "[.commits[] | select(.committedDate > \"$LAST_REVIEW_DATE\")] | .[].oid")
-
-if [ -z "$NEW_SHAS" ]; then
+if [ -n "$LAST_REVIEW_COMMIT" ] && [ "$LAST_REVIEW_COMMIT" = "$CURRENT_HEAD" ]; then
   echo "has_new_commits=false" >> "$GITHUB_OUTPUT"
   echo "commits=" >> "$GITHUB_OUTPUT"
 
-  # Skip logic: only on label trigger + skip enabled
   if [ "$SKIP_IF_ALREADY_REVIEWED" = "true" ] && [ "$EVENT_TYPE" = "pull_request" ]; then
     gh pr comment "$PR_NUMBER" --repo "$REPO" \
       --body "ℹ️ Skipping review — no new commits since the last Claude review. Push new commits to trigger a fresh review." || true
-    echo "::notice::Review skipped — no new commits since last review"
+    echo "::notice::Review skipped — HEAD unchanged since last review"
     exit 1
   fi
+  exit 0
+fi
+
+# --- HEAD changed: fetch recent commits for focus context ---
+# Use GraphQL commits(last:50) instead of `gh pr view --json commits` (which
+# defaults to first:100 and misses newer commits on large PRs).
+BASE_BRANCH=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json baseRefName --jq '.baseRefName')
+git fetch origin "$BASE_BRANCH" --depth=1
+
+OWNER="${REPO%%/*}"
+REPO_NAME="${REPO##*/}"
+
+NEW_SHAS=$(gh api graphql -f query="
+  { repository(owner:\"${OWNER}\", name:\"${REPO_NAME}\") {
+    pullRequest(number:${PR_NUMBER}) {
+      commits(last:50) {
+        nodes { commit { oid committedDate } }
+      }
+    }
+  }}" --jq "[.data.repository.pullRequest.commits.nodes[].commit | select(.committedDate > \"${LAST_REVIEW_DATE}\")] | .[].oid")
+
+if [ -z "$NEW_SHAS" ]; then
+  # HEAD changed but no commits found after review date (edge case: date mismatch
+  # or review came from comments API with no commit_id). Force re-review.
+  echo "has_new_commits=true" >> "$GITHUB_OUTPUT"
+  echo "commits=" >> "$GITHUB_OUTPUT"
+  echo "::notice::HEAD changed but no commits found after review date — proceeding with full re-review"
   exit 0
 fi
 

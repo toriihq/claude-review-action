@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] - 2026-03-12
+
+### Fixed
+- New-commit detection failed on PRs with >100 commits due to GraphQL `first:100` pagination limit silently dropping newer commits. Now uses HEAD SHA comparison (pagination-proof) for skip detection, and `commits(last:50)` for the focus commit list.
+- Consolidated 3 separate reviews API calls into 1.
+
 ## [1.0.0] - 2026-03-10
 
 ### Added
