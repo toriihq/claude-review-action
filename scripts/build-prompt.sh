@@ -146,10 +146,9 @@ if [ "$DISMISS_PREVIOUS_REVIEWS" = "true" ]; then
   cat >> "$PROMPT_FILE" <<'DISMISS_BLOCK'
 
 DISMISSING PREVIOUS REVIEWS:
-Before submitting your new review, dismiss ALL previous Claude reviews so only the latest review is visible:
-  for REVIEW_ID in $(gh api repos/$REPO/pulls/$PR_NUMBER/reviews --jq '[.[] | select(.user.login == "claude[bot]" and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "COMMENTED")) | .id] | .[]'); do
-    gh api repos/$REPO/pulls/$PR_NUMBER/reviews/$REVIEW_ID/dismissals --method PUT -f message="Superseded by new review" -f event="DISMISS" 2>/dev/null || true
-  done
+Before submitting your new review, dismiss previous Claude reviews so only the latest is visible.
+Run this SINGLE command (it checks and dismisses in one step — no separate check needed):
+  REVIEW_IDS=$(gh api repos/$REPO/pulls/$PR_NUMBER/reviews --jq '[.[] | select(.user.login == "claude[bot]" and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "COMMENTED")) | .id] | .[]' 2>/dev/null); if [ -n "$REVIEW_IDS" ]; then for REVIEW_ID in $REVIEW_IDS; do gh api repos/$REPO/pulls/$PR_NUMBER/reviews/$REVIEW_ID/dismissals --method PUT -f message="Superseded by new review" -f event="DISMISS" 2>/dev/null || true; done; echo "Dismissed previous reviews"; else echo "No previous reviews to dismiss"; fi
 IMPORTANT: Only dismiss previous reviews when performing a FULL code review. Do NOT dismiss when responding to a user question via @claude.
 DISMISS_BLOCK
 fi
