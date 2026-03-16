@@ -272,6 +272,7 @@ runs:
         APPROVE_MAX_FILES: ${{ inputs.approve-max-files }}
         DISMISS_PREVIOUS_REVIEWS: ${{ inputs.dismiss-previous-reviews }}
         FILE_COUNT: ${{ steps.capture-context.outputs.file_count }}
+        REVIEW_DEPTH: ${{ steps.resolve-depth.outputs.effective_depth }}
 
     - name: Run Claude Code Review
       if: steps.capture-context.outputs.skipped != 'true'
