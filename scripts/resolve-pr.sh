@@ -42,3 +42,15 @@ echo "event_type=$EVENT_NAME" >> "$GITHUB_OUTPUT"
 } >> "$GITHUB_OUTPUT"
 
 echo "::notice::Resolved PR #$PR_NUMBER (SHA: ${PR_SHA:0:7}, event: $EVENT_NAME)"
+
+# --- Detect deep review label ---
+if [ "$EVENT_NAME" = "pull_request" ]; then
+  TRIGGER_LABEL=$(echo "$EVENT_JSON" | jq -r '.label.name // ""')
+  if [ "$TRIGGER_LABEL" = "$DEEP_REVIEW_LABEL" ]; then
+    echo "is_deep_label=true" >> "$GITHUB_OUTPUT"
+  else
+    echo "is_deep_label=false" >> "$GITHUB_OUTPUT"
+  fi
+else
+  echo "is_deep_label=false" >> "$GITHUB_OUTPUT"
+fi
