@@ -239,7 +239,7 @@ runs:
         echo "::notice::Bumped max turns to $EFFECTIVE (+$EXTRA for $MISSING truncated files)"
       env:
         MISSING: ${{ steps.capture-context.outputs.missing_file_count }}
-        BASE_TURNS: ${{ inputs.max-turns }}
+        BASE_TURNS: ${{ steps.resolve-depth.outputs.effective_max_turns }}
 
     - name: Detect previous review
       if: steps.capture-context.outputs.skipped != 'true'
@@ -264,6 +264,20 @@ runs:
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         LAST_REVIEW_DATE: ${{ steps.detect-previous.outputs.last_review_date }}
         TRIGGER_PHRASE: ${{ inputs.trigger-phrase }}
+
+    - name: Post deep review pre-flight comment
+      if: |
+        steps.capture-context.outputs.skipped != 'true' &&
+        steps.resolve-depth.outputs.effective_depth == 'deep'
+      shell: bash
+      run: |
+        TOTAL_FILES=$(wc -l < /tmp/changed-files-stats.txt | tr -d ' ')
+        gh pr comment "$PR_NUMBER" --repo "$REPO" \
+          --body "🔍 Starting **deep review** of $TOTAL_FILES files. This will read each file's diff, source, callers, and tests." || true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
 
     - name: Build prompt
       if: steps.capture-context.outputs.skipped != 'true'
@@ -303,8 +317,8 @@ runs:
         label_trigger: ${{ inputs.review-label }}
         prompt: ${{ steps.build-prompt.outputs.prompt }}
         claude_args: |
-          --max-turns ${{ steps.adjust-turns.outputs.adjusted_max_turns || inputs.max-turns }}
-          --model ${{ inputs.model }}
+          --max-turns ${{ steps.adjust-turns.outputs.adjusted_max_turns || steps.resolve-depth.outputs.effective_max_turns }}
+          --model ${{ steps.resolve-depth.outputs.effective_model }}
           --allowedTools "${{ inputs.allowed-tools }}"
 
     - name: Post failure comment
@@ -316,7 +330,7 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        MAX_TURNS: ${{ steps.adjust-turns.outputs.adjusted_max_turns || inputs.max-turns }}
+        MAX_TURNS: ${{ steps.adjust-turns.outputs.adjusted_max_turns || steps.resolve-depth.outputs.effective_max_turns }}
         TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
 
     - name: Report cost
