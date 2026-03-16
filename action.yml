@@ -237,6 +237,7 @@ runs:
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         EVENT_TYPE: ${{ steps.resolve-pr.outputs.event_type }}
         SKIP_IF_ALREADY_REVIEWED: ${{ inputs.skip-if-already-reviewed }}
+        REVIEW_DEPTH: ${{ steps.resolve-depth.outputs.effective_depth }}
 
     - name: Fetch author comments
       if: steps.capture-context.outputs.skipped != 'true' && steps.detect-previous.outputs.has_previous == 'true' && inputs.include-previous-review == 'true'

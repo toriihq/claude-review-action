@@ -2,8 +2,13 @@
 set -euo pipefail
 
 # Detect previous Claude reviews and calculate relevant new commits.
-# Inputs (env vars): GH_TOKEN, REPO, PR_NUMBER, EVENT_TYPE, SKIP_IF_ALREADY_REVIEWED
+# Inputs (env vars): GH_TOKEN, REPO, PR_NUMBER, EVENT_TYPE, SKIP_IF_ALREADY_REVIEWED, REVIEW_DEPTH
 # Outputs (GITHUB_OUTPUT): has_previous, last_review_date, has_new_commits, commits
+
+# Deep reviews always run — a normal review should not block a deep review
+if [ "${REVIEW_DEPTH:-normal}" = "deep" ]; then
+  SKIP_IF_ALREADY_REVIEWED="false"
+fi
 # Outputs (files): /tmp/previous-review.txt
 
 # --- Find last Claude review (reviews API first, then comments API fallback) ---
