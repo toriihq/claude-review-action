@@ -16,6 +16,12 @@ After the Verdict line, include:
 If any files could not be read (e.g., deleted files), list them:
 > Files not reviewed: `file1.ts`, `file2.ts`
 
+DATA SEMANTICS CHECK:
+For every response body, notification payload, and external call in the diff:
+- Verify field names accurately describe the data (e.g., a query filtering active records should not populate a field called "total")
+- Verify field values are meaningful, not placeholders (e.g., entityId: 0, status: null)
+- Verify data passed to external services (Lambda, notifications) is consistent with how sibling endpoints pass the same data
+
 REVIEW FORMATTING:
 Use collapsed sections to keep reviews scannable:
 - Wrap code examples and detailed explanations in <details><summary>...</summary>...</details>
