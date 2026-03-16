@@ -146,6 +146,7 @@ runs:
         GITHUB_REPOSITORY: ${{ github.repository }}
         EVENT_NAME: ${{ github.event_name }}
         EVENT_JSON: ${{ toJSON(github.event) }}
+        DEEP_REVIEW_LABEL: ${{ inputs.deep-review-label }}
 
     - name: Validate inputs
       shell: bash
