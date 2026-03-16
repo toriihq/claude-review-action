@@ -1,5 +1,5 @@
 # Advanced Claude Code Review workflow
-# Shows all 20 inputs with explanatory comments.
+# Shows all 25 inputs with explanatory comments.
 name: Claude Code Review
 
 on:
@@ -17,9 +17,9 @@ concurrency:
 jobs:
   claude-review:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     if: |
-      (github.event_name == 'pull_request' && github.event.label.name == 'claude-review') ||
+      (github.event_name == 'pull_request' && (github.event.label.name == 'claude-review' || github.event.label.name == 'claude-deep-review')) ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude'))
     permissions:
@@ -71,3 +71,10 @@ jobs:
           include-previous-review: 'true'    # Enable re-review reconciliation
           track-cost: 'true'                 # Append cost to review
           dismiss-previous-reviews: 'true'   # Dismiss old reviews before new one
+
+          # Deep Review (opt-in via label)
+          review-depth: 'normal'                   # Default depth for all PRs
+          deep-review-label: 'claude-deep-review'  # Label that triggers deep review
+          deep-review-model: ''                    # Empty = same model; set to 'claude-opus-4-6' for deeper analysis
+          deep-max-files: '20'                     # Deep reviews capped at 20 files (cost scales faster)
+          deep-max-turns: '50'                     # More turns for flow tracing
