@@ -176,6 +176,41 @@ runs:
         GUIDE_PATH: ${{ inputs.review-guide-path }}
         DEFAULT_BRANCH: ${{ inputs.default-branch }}
 
+    - name: Resolve review depth
+      id: resolve-depth
+      shell: bash
+      run: |
+        # Determine effective depth (label override takes precedence)
+        if [ "$IS_DEEP_LABEL" = "true" ]; then
+          DEPTH="deep"
+        else
+          DEPTH="$REVIEW_DEPTH"
+        fi
+        echo "effective_depth=$DEPTH" >> "$GITHUB_OUTPUT"
+
+        # Determine effective model
+        if [ "$DEPTH" = "deep" ] && [ -n "$DEEP_REVIEW_MODEL" ]; then
+          echo "effective_model=$DEEP_REVIEW_MODEL" >> "$GITHUB_OUTPUT"
+        else
+          echo "effective_model=$MODEL" >> "$GITHUB_OUTPUT"
+        fi
+
+        # Determine effective max turns
+        if [ "$DEPTH" = "deep" ]; then
+          echo "effective_max_turns=$DEEP_MAX_TURNS" >> "$GITHUB_OUTPUT"
+        else
+          echo "effective_max_turns=$MAX_TURNS" >> "$GITHUB_OUTPUT"
+        fi
+
+        echo "::notice::Review depth: $DEPTH"
+      env:
+        IS_DEEP_LABEL: ${{ steps.resolve-pr.outputs.is_deep_label }}
+        REVIEW_DEPTH: ${{ inputs.review-depth }}
+        DEEP_REVIEW_MODEL: ${{ inputs.deep-review-model }}
+        MODEL: ${{ inputs.model }}
+        MAX_TURNS: ${{ inputs.max-turns }}
+        DEEP_MAX_TURNS: ${{ inputs.deep-max-turns }}
+
     - name: Capture context
       id: capture-context
       shell: bash
@@ -188,6 +223,8 @@ runs:
         MAX_DIFF_LINES: ${{ inputs.max-diff-lines }}
         MAX_DIFF_BYTES: ${{ inputs.max-diff-bytes }}
         INCLUDE_PR_DESCRIPTION: ${{ inputs.include-pr-description }}
+        REVIEW_DEPTH: ${{ steps.resolve-depth.outputs.effective_depth }}
+        DEEP_MAX_FILES: ${{ inputs.deep-max-files }}
 
     - name: Detect previous review
       if: steps.capture-context.outputs.skipped != 'true'
