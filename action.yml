@@ -157,6 +157,7 @@ runs:
         GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        REVIEW_DEPTH: ${{ inputs.review-depth }}
 
     - name: Checkout PR
       uses: actions/checkout@v4

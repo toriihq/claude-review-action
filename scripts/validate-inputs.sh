@@ -35,6 +35,21 @@ MSG
     ;;
 esac
 
+# Check for valid review depth
+case "${REVIEW_DEPTH:-normal}" in
+  normal|deep) ;;
+  *)
+    post_error "$(cat <<MSG
+❌ **Claude Review failed — invalid configuration**
+
+\`review-depth: '${REVIEW_DEPTH}'\` is not valid. Must be one of: \`normal\`, \`deep\`.
+MSG
+)"
+    echo "::error::Invalid review-depth: '${REVIEW_DEPTH}'. Must be one of: normal, deep."
+    exit 1
+    ;;
+esac
+
 # Validate the key works with a lightweight API call
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
   https://api.anthropic.com/v1/messages \
