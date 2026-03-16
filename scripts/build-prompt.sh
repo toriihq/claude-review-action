@@ -233,7 +233,26 @@ AUTH_FULL_NORMAL
     ;;
 esac
 
-# --- Section 11: Extra prompt (if provided) ---
+# --- Section 11: Review depth marker + visible label ---
+# Hidden marker (for skip-if-already-reviewed detection — never change this format):
+DEPTH_VALUE="${REVIEW_DEPTH:-normal}"
+echo "" >> "$PROMPT_FILE"
+cat >> "$PROMPT_FILE" <<DEPTH_END
+REVIEW DEPTH TAGGING:
+You MUST include BOTH of these at the very top of your review body (before any findings):
+1. This hidden marker (exactly as shown — never modify): <!-- claude-review-depth: ${DEPTH_VALUE} -->
+2. This visible label on the next line:
+DEPTH_END
+
+if [ "$DEPTH_VALUE" = "deep" ]; then
+  echo '   🔬 *Deep Review — cross-file analysis with caller/test tracing*' >> "$PROMPT_FILE"
+else
+  echo '   📋 *Code Review*' >> "$PROMPT_FILE"
+fi
+echo "" >> "$PROMPT_FILE"
+echo "Both lines must appear before any review content. The hidden marker must be the very first line of the body." >> "$PROMPT_FILE"
+
+# --- Section 12: Extra prompt (if provided) ---
 if [ -n "$EXTRA_PROMPT" ]; then
   echo "" >> "$PROMPT_FILE"
   echo "$EXTRA_PROMPT" >> "$PROMPT_FILE"
