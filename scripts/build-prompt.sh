@@ -175,24 +175,35 @@ Do NOT use APPROVE — this authority level cannot approve PRs.
 AUTH_RC
     ;;
   full)
-    # NOTE: Unquoted heredoc <<AUTH_FULL means shell expansion is active.
+    # NOTE: Unquoted heredoc means shell expansion is active.
     # \$REPO and \$PR_NUMBER are escaped → become literal $REPO/$PR_NUMBER in Claude's prompt.
-    # ${APPROVE_MAX_FILES} is NOT escaped → expands to the actual input value (intentional).
-    cat >> "$PROMPT_FILE" <<AUTH_FULL
-
-SUBMITTING THE REVIEW:
-If your review has 🔴 BLOCKERS or 🟠 HIGH findings, use REQUEST_CHANGES:
-  gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=REQUEST_CHANGES -f body="your review"
-If your review is clean and the PR has <= ${APPROVE_MAX_FILES} files, use APPROVE:
-  gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=APPROVE -f body="your review"
-Otherwise use COMMENT:
-  gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=COMMENT -f body="your review"
-AUTH_FULL
-
+    # ${APPROVE_MAX_FILES} and threshold conditions expand to actual values (intentional).
     if [ "$APPROVE_THRESHOLD" = "strict" ]; then
-      echo "Approval threshold: STRICT — approve only if zero MEDIUM or higher findings." >> "$PROMPT_FILE"
+      cat >> "$PROMPT_FILE" <<AUTH_FULL_STRICT
+
+SUBMITTING THE REVIEW — choose the event based on your findings:
+1. If ANY 🔴 BLOCKER, 🟠 HIGH, or 🟡 MEDIUM findings exist → REQUEST_CHANGES:
+     gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=REQUEST_CHANGES -f body="your review"
+2. If ONLY 🔵 LOW findings (or no findings at all) AND the PR has <= ${APPROVE_MAX_FILES} files → APPROVE:
+     gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=APPROVE -f body="your review"
+3. Otherwise → COMMENT:
+     gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=COMMENT -f body="your review"
+
+⚠️ STRICT THRESHOLD: You MUST NOT approve if there are ANY findings at 🟡 MEDIUM severity or above.
+AUTH_FULL_STRICT
     else
-      echo "Approval threshold: NORMAL — approve if zero HIGH or higher findings (MEDIUM is acceptable)." >> "$PROMPT_FILE"
+      cat >> "$PROMPT_FILE" <<AUTH_FULL_NORMAL
+
+SUBMITTING THE REVIEW — choose the event based on your findings:
+1. If ANY 🔴 BLOCKER or 🟠 HIGH findings exist → REQUEST_CHANGES:
+     gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=REQUEST_CHANGES -f body="your review"
+2. If NO findings above 🟡 MEDIUM (i.e., only MEDIUM/LOW or no findings) AND the PR has <= ${APPROVE_MAX_FILES} files → APPROVE:
+     gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=APPROVE -f body="your review"
+3. Otherwise → COMMENT:
+     gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=COMMENT -f body="your review"
+
+⚠️ NORMAL THRESHOLD: You MUST NOT approve if there are ANY 🟠 HIGH or 🔴 BLOCKER findings.
+AUTH_FULL_NORMAL
     fi
     ;;
 esac

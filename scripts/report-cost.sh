@@ -44,8 +44,10 @@ if [ -n "$REVIEW_ID" ]; then
     gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID}" --method PUT --input - 2>/dev/null || \
   gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$COST_LINE" || true
 else
-  # No review found — post as standalone comment
-  gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$COST_LINE" || true
+  # No review found — Claude handled a non-review request (e.g., @claude comment).
+  # Skip cost report since it wasn't a code review.
+  echo "::notice::No Claude review found — skipping cost report (non-review action)"
+  exit 0
 fi
 
 echo "::notice::Cost reported: ${COST_FMT} (${TURNS} turns, ${MODEL})"
