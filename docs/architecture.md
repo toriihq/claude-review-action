@@ -290,7 +290,5 @@ In deep mode, the script generates **individual diff files** on disk that Claude
 | **Test coverage** | Not checked | Read test file if exists |
 | **Prompt size** | Grows with diff size | Fixed (manifest only) |
 | **Turns** | 3–7 | 12–18 |
-| **Cost (Sonnet)** | ~$0.11 | ~$0.19 |
-| **Cost (Opus)** | — | ~$0.26 |
 
 The key insight: in deep mode, the diff is **not in the prompt** — it's on disk. This keeps the prompt small and forces Claude to actively read each file's diff as a deliberate step, then follow the protocol to investigate callers and tests. The tool calls are what enable cross-file analysis that catches bugs invisible to diff-only review.
