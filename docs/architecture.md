@@ -160,7 +160,7 @@
 │  │  │      1. Read /tmp/diffs/<path>.diff                      │     │
 │  │  │      2. Read full source file                            │     │
 │  │  │      3. Grep for callers/importers                       │     │
-│  │  │      4. Read most relevant callers (up to 3)             │     │
+│  │  │      4. Read relevant callers (follow if suspicious)      │     │
 │  │  │      5. Check test coverage                              │     │
 │  │  │      6. Cross-file analysis                              │     │
 │  │  │      7. Submit review                                    │     │
@@ -207,7 +207,7 @@
 │  │                                 │ Grep for callers     │    │     │
 │  │                                 │        │             │    │     │
 │  │                                 │        ▼             │    │     │
-│  │                                 │ Read top 3 callers   │    │     │
+│  │                                 │ Read relevant callers │    │     │
 │  │                                 │        │             │    │     │
 │  │                                 │        ▼             │    │     │
 │  │                                 │ Read test file       │    │     │
@@ -286,7 +286,7 @@ In deep mode, the script generates **individual diff files** on disk that Claude
 | **Diff in prompt** | Yes — entire diff inline | No — only file manifest |
 | **Context lines** | 3 (default `gh pr diff`) | 20 (`-U20`) |
 | **Claude reads files** | Sometimes (if truncated) | Always (per protocol) |
-| **Callers/importers** | Not checked | Grep + Read up to 3 |
+| **Callers/importers** | Not checked | Grep + Read as needed |
 | **Test coverage** | Not checked | Read test file if exists |
 | **Prompt size** | Grows with diff size | Fixed (manifest only) |
 | **Turns** | 3–7 | 12–18 |

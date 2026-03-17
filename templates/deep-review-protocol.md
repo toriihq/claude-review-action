@@ -11,7 +11,7 @@ Do NOT form opinions from the file manifest alone. Follow this protocol for EVER
    If the diff shows a file was **deleted**, skip this step — the file no longer exists at HEAD.
    Focus instead on callers that may still reference removed exports.
 3. **Find callers/importers** — `Grep` for files that import or call the changed functions/classes
-4. **Read the most relevant callers** (up to 3) — check if the change breaks assumptions
+4. **Read the most relevant callers** — check if the change breaks assumptions. Start with the most suspicious and keep going if something looks wrong.
 5. **Check test coverage** — read the corresponding test file if it exists and wasn't already changed in this PR
 
 ### After reading all files:
