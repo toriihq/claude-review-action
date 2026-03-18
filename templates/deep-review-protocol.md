@@ -3,6 +3,8 @@
 You have access to per-file diffs at `/tmp/diffs/<filepath>.diff` and the full checked-out codebase.
 Do NOT form opinions from the file manifest alone. Follow this protocol for EVERY changed file:
 
+**Explore, don't just verify.** The hardest bugs are semantic — a function name that promises one thing but the query does another, an unbounded fetch hidden behind a `.slice()`, a filter that silently drops data the caller expects. Don't just check patterns; reason about what the code actually does at runtime and whether that matches its contract.
+
 ### For each changed file:
 1. **Read the diff** — `Read /tmp/diffs/<filepath>.diff` to understand what changed.
    If the diff file is empty, the file may have been renamed or had only permission/binary changes —
