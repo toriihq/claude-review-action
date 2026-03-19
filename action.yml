@@ -90,7 +90,7 @@ inputs:
     required: false
     default: '@claude'
   default-branch:
-    description: 'Base branch for guide fetch. Empty = auto-detect from repo settings.'
+    description: 'Base branch for guide fetch and config restore. Empty = auto-detect from repo settings.'
     required: false
     default: ''
 
@@ -219,6 +219,7 @@ runs:
       uses: anthropics/claude-code-action@v1
       with:
         anthropic_api_key: ${{ inputs.anthropic-api-key }}
+        base_branch: ${{ inputs.default-branch || github.event.repository.default_branch }}
         allowed_bots: ''
         track_progress: false
         show_full_output: true
