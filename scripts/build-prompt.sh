@@ -85,7 +85,7 @@ For example, to read the diff for `src/api/handler.ts`:
   Read /tmp/diffs/src/api/handler.ts.diff
 DEEP_DIFFS
 
-  # Deep review protocol
+  # Deep review protocol (diff access instructions)
   cat "${ACTION_PATH}/templates/deep-review-protocol.md" >> "$PROMPT_FILE"
 
 else
@@ -245,7 +245,7 @@ You MUST include BOTH of these at the very top of your review body (before any f
 DEPTH_END
 
 if [ "$DEPTH_VALUE" = "deep" ]; then
-  echo '   🔬 *Deep Review — cross-file analysis with caller/test tracing*' >> "$PROMPT_FILE"
+  echo '   🔬 *Deep Review — per-file analysis with full source context*' >> "$PROMPT_FILE"
 else
   echo '   📋 *Code Review*' >> "$PROMPT_FILE"
 fi
