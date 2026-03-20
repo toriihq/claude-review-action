@@ -126,9 +126,9 @@ inputs:
     required: false
     default: ''
   deep-max-files:
-    description: 'Skip deep review if PR exceeds this many files (deep mode cost scales faster)'
+    description: 'Skip deep review if PR exceeds this many files'
     required: false
-    default: '20'
+    default: '50'
   deep-max-turns:
     description: 'Claude turn limit for deep reviews (needs more turns than normal)'
     required: false
