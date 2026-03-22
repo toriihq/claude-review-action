@@ -112,6 +112,28 @@ inputs:
     required: false
     default: 'true'
 
+  # Deep Review
+  review-depth:
+    description: 'Review depth: normal (diff-first) or deep (per-file diffs + flow tracing)'
+    required: false
+    default: 'normal'
+  deep-review-label:
+    description: 'Label that overrides review-depth to deep (applied per-PR)'
+    required: false
+    default: 'claude-deep-review'
+  deep-review-model:
+    description: 'Model override for deep reviews. Empty = use the model input.'
+    required: false
+    default: ''
+  deep-max-files:
+    description: 'Skip deep review if PR exceeds this many files'
+    required: false
+    default: '50'
+  deep-max-turns:
+    description: 'Claude turn limit for deep reviews (needs more turns than normal)'
+    required: false
+    default: '50'
+
 runs:
   using: 'composite'
   steps:
@@ -124,6 +146,7 @@ runs:
         GITHUB_REPOSITORY: ${{ github.repository }}
         EVENT_NAME: ${{ github.event_name }}
         EVENT_JSON: ${{ toJSON(github.event) }}
+        DEEP_REVIEW_LABEL: ${{ inputs.deep-review-label }}
 
     - name: Validate inputs
       shell: bash
@@ -134,6 +157,7 @@ runs:
         GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        REVIEW_DEPTH: ${{ inputs.review-depth }}
 
     - name: Checkout PR
       uses: actions/checkout@v4
@@ -152,6 +176,41 @@ runs:
         GUIDE_PATH: ${{ inputs.review-guide-path }}
         DEFAULT_BRANCH: ${{ inputs.default-branch }}
 
+    - name: Resolve review depth
+      id: resolve-depth
+      shell: bash
+      run: |
+        # Determine effective depth (label override takes precedence)
+        if [ "$IS_DEEP_LABEL" = "true" ]; then
+          DEPTH="deep"
+        else
+          DEPTH="$REVIEW_DEPTH"
+        fi
+        echo "effective_depth=$DEPTH" >> "$GITHUB_OUTPUT"
+
+        # Determine effective model
+        if [ "$DEPTH" = "deep" ] && [ -n "$DEEP_REVIEW_MODEL" ]; then
+          echo "effective_model=$DEEP_REVIEW_MODEL" >> "$GITHUB_OUTPUT"
+        else
+          echo "effective_model=$MODEL" >> "$GITHUB_OUTPUT"
+        fi
+
+        # Determine effective max turns
+        if [ "$DEPTH" = "deep" ]; then
+          echo "effective_max_turns=$DEEP_MAX_TURNS" >> "$GITHUB_OUTPUT"
+        else
+          echo "effective_max_turns=$MAX_TURNS" >> "$GITHUB_OUTPUT"
+        fi
+
+        echo "::notice::Review depth: $DEPTH"
+      env:
+        IS_DEEP_LABEL: ${{ steps.resolve-pr.outputs.is_deep_label }}
+        REVIEW_DEPTH: ${{ inputs.review-depth }}
+        DEEP_REVIEW_MODEL: ${{ inputs.deep-review-model }}
+        MODEL: ${{ inputs.model }}
+        MAX_TURNS: ${{ inputs.max-turns }}
+        DEEP_MAX_TURNS: ${{ inputs.deep-max-turns }}
+
     - name: Capture context
       id: capture-context
       shell: bash
@@ -164,6 +223,8 @@ runs:
         MAX_DIFF_LINES: ${{ inputs.max-diff-lines }}
         MAX_DIFF_BYTES: ${{ inputs.max-diff-bytes }}
         INCLUDE_PR_DESCRIPTION: ${{ inputs.include-pr-description }}
+        REVIEW_DEPTH: ${{ steps.resolve-depth.outputs.effective_depth }}
+        DEEP_MAX_FILES: ${{ inputs.deep-max-files }}
 
     - name: Detect previous review
       if: steps.capture-context.outputs.skipped != 'true'
@@ -176,6 +237,7 @@ runs:
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         EVENT_TYPE: ${{ steps.resolve-pr.outputs.event_type }}
         SKIP_IF_ALREADY_REVIEWED: ${{ inputs.skip-if-already-reviewed }}
+        REVIEW_DEPTH: ${{ steps.resolve-depth.outputs.effective_depth }}
 
     - name: Fetch author comments
       if: steps.capture-context.outputs.skipped != 'true' && steps.detect-previous.outputs.has_previous == 'true' && inputs.include-previous-review == 'true'
@@ -188,6 +250,20 @@ runs:
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         LAST_REVIEW_DATE: ${{ steps.detect-previous.outputs.last_review_date }}
         TRIGGER_PHRASE: ${{ inputs.trigger-phrase }}
+
+    - name: Post deep review pre-flight comment
+      if: |
+        steps.capture-context.outputs.skipped != 'true' &&
+        steps.resolve-depth.outputs.effective_depth == 'deep'
+      shell: bash
+      run: |
+        TOTAL_FILES=$(wc -l < /tmp/changed-files-stats.txt | tr -d ' ')
+        gh pr comment "$PR_NUMBER" --repo "$REPO" \
+          --body "🔍 Starting **deep review** of $TOTAL_FILES files. This will read each file's diff, source, callers, and tests." || true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
 
     - name: Build prompt
       if: steps.capture-context.outputs.skipped != 'true'
@@ -211,6 +287,7 @@ runs:
         APPROVE_MAX_FILES: ${{ inputs.approve-max-files }}
         DISMISS_PREVIOUS_REVIEWS: ${{ inputs.dismiss-previous-reviews }}
         FILE_COUNT: ${{ steps.capture-context.outputs.file_count }}
+        REVIEW_DEPTH: ${{ steps.resolve-depth.outputs.effective_depth }}
 
     - name: Run Claude Code Review
       if: steps.capture-context.outputs.skipped != 'true'
@@ -226,8 +303,8 @@ runs:
         label_trigger: ${{ inputs.review-label }}
         prompt: ${{ steps.build-prompt.outputs.prompt }}
         claude_args: |
-          --max-turns ${{ inputs.max-turns }}
-          --model ${{ inputs.model }}
+          --max-turns ${{ steps.resolve-depth.outputs.effective_max_turns }}
+          --model ${{ steps.resolve-depth.outputs.effective_model }}
           --allowedTools "${{ inputs.allowed-tools }}"
 
     - name: Post failure comment
@@ -239,7 +316,7 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        MAX_TURNS: ${{ inputs.max-turns }}
+        MAX_TURNS: ${{ steps.resolve-depth.outputs.effective_max_turns }}
         TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
 
     - name: Report cost

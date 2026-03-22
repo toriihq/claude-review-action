@@ -2,8 +2,23 @@
 set -euo pipefail
 
 # Detect previous Claude reviews and calculate relevant new commits.
-# Inputs (env vars): GH_TOKEN, REPO, PR_NUMBER, EVENT_TYPE, SKIP_IF_ALREADY_REVIEWED
+# Inputs (env vars): GH_TOKEN, REPO, PR_NUMBER, EVENT_TYPE, SKIP_IF_ALREADY_REVIEWED, REVIEW_DEPTH
 # Outputs (GITHUB_OUTPUT): has_previous, last_review_date, has_new_commits, commits
+
+# Deep review skip logic: skip only if previous review was also deep.
+# A normal review should NOT block a deep review (deep adds cross-file analysis).
+# This check runs early so it can override SKIP_IF_ALREADY_REVIEWED before any skip decision.
+if [ "${REVIEW_DEPTH:-normal}" = "deep" ] && [ "$SKIP_IF_ALREADY_REVIEWED" = "true" ]; then
+  PREV_REVIEW_BODY=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+    --jq '[.[] | select(.user.login == "claude[bot]" and (.body | test("Verdict"))) | .body] | last // empty' 2>/dev/null || true)
+
+  if echo "$PREV_REVIEW_BODY" | grep -q "claude-review-depth: deep"; then
+    echo "::notice::Previous review was deep — respecting skip-if-already-reviewed"
+  else
+    SKIP_IF_ALREADY_REVIEWED="false"
+    echo "::notice::Deep review requested — previous review was normal (or none), bypassing skip"
+  fi
+fi
 # Outputs (files): /tmp/previous-review.txt
 
 # --- Find last Claude review (reviews API first, then comments API fallback) ---

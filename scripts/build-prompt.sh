@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Assemble the full review prompt from inputs, captured context, and templates.
 # Inputs (env vars): ACTION_PATH, REPO, PR_NUMBER, EVENT_TYPE, USER_COMMENT,
-#   HAS_PREVIOUS, NEW_COMMITS, INCLUDE_PREVIOUS_REVIEW, CONTEXT_INTRO, CRITICAL_RULES,
+#   HAS_PREVIOUS, NEW_COMMITS, INCLUDE_PREVIOUS_REVIEW, CONTEXT_INTRO, CRITICAL_RULES, REVIEW_DEPTH,
 #   EXTRA_PROMPT, REVIEW_AUTHORITY, APPROVE_THRESHOLD, APPROVE_MAX_FILES,
 #   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT
 # Outputs (GITHUB_OUTPUT): prompt
@@ -65,8 +65,32 @@ if [ -s /tmp/review-guide.md ]; then
   cat /tmp/review-guide.md >> "$PROMPT_FILE"
 fi
 
-# --- Section 7: PR diff ---
-cat >> "$PROMPT_FILE" <<'DIFF_HEADER'
+# --- Section 7: Diff content (branches on review depth) ---
+if [ "${REVIEW_DEPTH:-normal}" = "deep" ]; then
+  # Deep mode: file manifest + protocol (diffs accessed via Read tool)
+  cat >> "$PROMPT_FILE" <<'DEEP_HEADER'
+
+---
+
+## CHANGED FILES IN THIS PR:
+DEEP_HEADER
+  cat /tmp/diff-manifest.txt >> "$PROMPT_FILE"
+
+  cat >> "$PROMPT_FILE" <<'DEEP_DIFFS'
+
+Per-file diffs with 20 lines of surrounding context are available at:
+  /tmp/diffs/<filepath>.diff
+
+For example, to read the diff for `src/api/handler.ts`:
+  Read /tmp/diffs/src/api/handler.ts.diff
+DEEP_DIFFS
+
+  # Deep review protocol
+  cat "${ACTION_PATH}/templates/deep-review-protocol.md" >> "$PROMPT_FILE"
+
+else
+  # Normal mode: inject monolithic diff into prompt (existing behavior)
+  cat >> "$PROMPT_FILE" <<'DIFF_HEADER'
 
 ---
 
@@ -74,13 +98,13 @@ cat >> "$PROMPT_FILE" <<'DIFF_HEADER'
 ```diff
 DIFF_HEADER
 
-cat /tmp/pr-diff.txt >> "$PROMPT_FILE"
-echo '```' >> "$PROMPT_FILE"
+  cat /tmp/pr-diff.txt >> "$PROMPT_FILE"
+  echo '```' >> "$PROMPT_FILE"
 
-# --- Section 7b: Truncated files list (if diff was truncated) ---
-if [ -s /tmp/truncated-files.txt ]; then
-  MISSING_COUNT=$(wc -l < /tmp/truncated-files.txt | tr -d ' ')
-  cat >> "$PROMPT_FILE" <<TRUNC_HEADER
+  # Section 7b: Truncated files list (if diff was truncated)
+  if [ -s /tmp/truncated-files.txt ]; then
+    MISSING_COUNT=$(wc -l < /tmp/truncated-files.txt | tr -d ' ')
+    cat >> "$PROMPT_FILE" <<TRUNC_HEADER
 
 ## ⚠️ DIFF TRUNCATED — ${MISSING_COUNT} files not shown
 
@@ -92,9 +116,10 @@ You MUST spot-check at least 2-3 of these files using the Read tool, prioritizin
 
 **Files not in diff:**
 TRUNC_HEADER
-  while IFS= read -r file; do
-    echo "- \`$file\`" >> "$PROMPT_FILE"
-  done < /tmp/truncated-files.txt
+    while IFS= read -r file; do
+      echo "- \`$file\`" >> "$PROMPT_FILE"
+    done < /tmp/truncated-files.txt
+  fi
 fi
 
 # --- Section 8: Focus info (re-review with new commits — always shown, even without reconciliation) ---
@@ -208,7 +233,26 @@ AUTH_FULL_NORMAL
     ;;
 esac
 
-# --- Section 11: Extra prompt (if provided) ---
+# --- Section 11: Review depth marker + visible label ---
+# Hidden marker (for skip-if-already-reviewed detection — never change this format):
+DEPTH_VALUE="${REVIEW_DEPTH:-normal}"
+echo "" >> "$PROMPT_FILE"
+cat >> "$PROMPT_FILE" <<DEPTH_END
+REVIEW DEPTH TAGGING:
+You MUST include BOTH of these at the very top of your review body (before any findings):
+1. This hidden marker (exactly as shown — never modify): <!-- claude-review-depth: ${DEPTH_VALUE} -->
+2. This visible label on the next line:
+DEPTH_END
+
+if [ "$DEPTH_VALUE" = "deep" ]; then
+  echo '   🔬 *Deep Review — cross-file analysis with caller/test tracing*' >> "$PROMPT_FILE"
+else
+  echo '   📋 *Code Review*' >> "$PROMPT_FILE"
+fi
+echo "" >> "$PROMPT_FILE"
+echo "Both lines must appear before any review content. The hidden marker must be the very first line of the body." >> "$PROMPT_FILE"
+
+# --- Section 12: Extra prompt (if provided) ---
 if [ -n "$EXTRA_PROMPT" ]; then
   echo "" >> "$PROMPT_FILE"
   echo "$EXTRA_PROMPT" >> "$PROMPT_FILE"
