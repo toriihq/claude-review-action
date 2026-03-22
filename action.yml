@@ -165,6 +165,21 @@ runs:
         MAX_DIFF_BYTES: ${{ inputs.max-diff-bytes }}
         INCLUDE_PR_DESCRIPTION: ${{ inputs.include-pr-description }}
 
+    - name: Adjust turns for truncated diffs
+      if: steps.capture-context.outputs.skipped != 'true' && steps.capture-context.outputs.missing_file_count != '0'
+      id: adjust-turns
+      shell: bash
+      run: |
+        # Bump max turns so Claude has room to Read all missing files
+        # ~5 files per turn (parallel reads) + 2 buffer turns
+        EXTRA=$(( (MISSING + 4) / 5 + 2 ))
+        EFFECTIVE=$(( BASE_TURNS + EXTRA ))
+        echo "adjusted_max_turns=$EFFECTIVE" >> "$GITHUB_OUTPUT"
+        echo "::notice::Bumped max turns to $EFFECTIVE (+$EXTRA for $MISSING truncated files)"
+      env:
+        MISSING: ${{ steps.capture-context.outputs.missing_file_count }}
+        BASE_TURNS: ${{ inputs.max-turns }}
+
     - name: Detect previous review
       if: steps.capture-context.outputs.skipped != 'true'
       id: detect-previous
@@ -226,7 +241,7 @@ runs:
         label_trigger: ${{ inputs.review-label }}
         prompt: ${{ steps.build-prompt.outputs.prompt }}
         claude_args: |
-          --max-turns ${{ inputs.max-turns }}
+          --max-turns ${{ steps.adjust-turns.outputs.adjusted_max_turns || inputs.max-turns }}
           --model ${{ inputs.model }}
           --allowedTools "${{ inputs.allowed-tools }}"
 
@@ -239,7 +254,7 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        MAX_TURNS: ${{ inputs.max-turns }}
+        MAX_TURNS: ${{ steps.adjust-turns.outputs.adjusted_max_turns || inputs.max-turns }}
         TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
 
     - name: Report cost
