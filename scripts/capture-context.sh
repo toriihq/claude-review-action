@@ -70,7 +70,10 @@ if [ "$TRUNCATED" = "true" ]; then
   # Files in PR but not in truncated diff
   comm -23 /tmp/all-pr-files.txt /tmp/included-files.txt > /tmp/truncated-files.txt
   MISSING_COUNT=$(wc -l < /tmp/truncated-files.txt | tr -d ' ')
+  echo "missing_file_count=$MISSING_COUNT" >> "$GITHUB_OUTPUT"
   echo "::notice::Diff truncated — $MISSING_COUNT files not included in diff"
+else
+  echo "missing_file_count=0" >> "$GITHUB_OUTPUT"
 fi
 
 # --- Capture PR description ---

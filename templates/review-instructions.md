@@ -10,10 +10,11 @@ End with a Verdict line. Skip empty sections.
 
 TRUNCATED DIFF DISCLOSURE:
 If the diff was truncated (you'll see a "DIFF TRUNCATED" section listing missing files),
-you MUST include a note at the end of your review, after the Verdict line:
-> **⚠️ Partial review:** Diff was truncated. Files not fully reviewed: `file1.ts`, `file2.ts`, ...
-> Spot-checked N of M missing files; remaining may need manual review.
-List only the files you did NOT Read. This helps human reviewers focus their effort.
+you MUST read ALL missing files using the Read tool before submitting your review.
+After the Verdict line, include:
+> **⚠️ Diff was truncated.** Reviewed N missing files via Read tool.
+If any files could not be read (e.g., deleted files), list them:
+> Files not reviewed: `file1.ts`, `file2.ts`
 
 REVIEW FORMATTING:
 Use collapsed sections to keep reviews scannable:

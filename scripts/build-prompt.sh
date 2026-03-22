@@ -85,10 +85,12 @@ if [ -s /tmp/truncated-files.txt ]; then
 ## ⚠️ DIFF TRUNCATED — ${MISSING_COUNT} files not shown
 
 The following files are part of this PR but were cut off by the diff size limit.
-You MUST spot-check at least 2-3 of these files using the Read tool, prioritizing:
-- Files matching CRITICAL RULES patterns (routes, DB queries, Lambda invokes)
-- Files with security-sensitive names (auth, permissions, secrets, credentials)
-- New files (more likely to have issues than modifications)
+You MUST read and review ALL of these files using the Read tool before submitting your review.
+Prioritize reading order by risk:
+1. Files matching CRITICAL RULES patterns (routes, DB queries, Lambda invokes)
+2. Files with security-sensitive names (auth, permissions, secrets, credentials)
+3. New files (more likely to have issues than modifications)
+4. All remaining files
 
 **Files not in diff:**
 TRUNC_HEADER
