@@ -159,11 +159,12 @@
 │  │  │    Deep review protocol (from template):                 │     │
 │  │  │      1. Read /tmp/diffs/<path>.diff                      │     │
 │  │  │      2. Read full source file                            │     │
-│  │  │      3. Grep for callers/importers                       │     │
-│  │  │      4. Read relevant callers (follow if suspicious)      │     │
-│  │  │      5. Check test coverage                              │     │
-│  │  │      6. Cross-file analysis                              │     │
-│  │  │      7. Submit review                                    │     │
+│  │  │      3. Assess impact (contract/signature change?)       │     │
+│  │  │      4. Grep for callers/importers (if exported API)     │     │
+│  │  │      5. Read relevant callers (follow if suspicious)     │     │
+│  │  │      6. Check test coverage                              │     │
+│  │  │      7. Cross-file analysis                              │     │
+│  │  │      8. Submit review                                    │     │
 │  │  │                                                          │     │
 │  │  Section 8:  Focus info (new commits since last review)     │     │
 │  │  Section 9:  Previous review + reconciliation instructions  │     │
@@ -268,15 +269,16 @@ In deep mode, the script generates **individual diff files** on disk that Claude
 2. **`build-prompt.sh`** does NOT inject the diffs into the prompt. Instead it injects:
    - The file manifest (so Claude knows what changed)
    - Instructions: "Per-file diffs available at `/tmp/diffs/<filepath>.diff`"
-   - The deep review protocol (7-step process)
+   - The deep review protocol (8-step process)
 
 3. **Claude** (during `claude-code-action`) uses `Read` tool calls to access each diff:
    ```
    Read /tmp/diffs/src/routes/pauseIntegration.ts.diff   ← step 1: read the diff
    Read src/routes/pauseIntegration.ts                    ← step 2: read full source
-   Grep "pauseIntegration" src/                           ← step 3: find callers
-   Read src/routes/deleteIntegration.ts                   ← step 4: read sibling
-   Read src/routes/__tests__/pauseIntegration.test.ts     ← step 5: check tests
+   (step 3: assess impact — exported API changed? trace callers)
+   Grep "pauseIntegration" src/                           ← step 4: find callers
+   Read src/routes/deleteIntegration.ts                   ← step 5: read sibling
+   Read src/routes/__tests__/pauseIntegration.test.ts     ← step 6: check tests
    ```
 
 ### Why per-file diffs instead of monolithic?
@@ -286,7 +288,7 @@ In deep mode, the script generates **individual diff files** on disk that Claude
 | **Diff in prompt** | Yes — entire diff inline | No — only file manifest |
 | **Context lines** | 3 (default `gh pr diff`) | 20 (`-U20`) |
 | **Claude reads files** | Sometimes (if truncated) | Always (per protocol) |
-| **Callers/importers** | Not checked | Grep + Read as needed |
+| **Callers/importers** | Not checked | Grep + Read when exported API changes |
 | **Test coverage** | Not checked | Read test file if exists |
 | **Prompt size** | Grows with diff size | Fixed (manifest only) |
 | **Turns** | 3–7 | 12–18 |

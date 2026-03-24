@@ -47,7 +47,7 @@ if [ "${REVIEW_DEPTH:-normal}" = "deep" ]; then
   # both commits' trees are available after depth=1 fetches
   while IFS=$'\t' read -r filepath additions deletions; do
     mkdir -p "/tmp/diffs/$(dirname "$filepath")"
-    git diff "origin/${BASE_BRANCH}" HEAD -U20 -- "$filepath" \
+    git diff --find-renames "origin/${BASE_BRANCH}" HEAD -U20 -- "$filepath" \
       > "/tmp/diffs/${filepath}.diff" 2>/dev/null || true
   done < /tmp/changed-files-stats.txt
 

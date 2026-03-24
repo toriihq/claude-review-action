@@ -274,7 +274,7 @@ runs:
       run: |
         TOTAL_FILES=$(wc -l < /tmp/changed-files-stats.txt | tr -d ' ')
         gh pr comment "$PR_NUMBER" --repo "$REPO" \
-          --body "🔍 Starting **deep review** of $TOTAL_FILES files. This will read each file's diff, source, callers, and tests." || true
+          --body "🔍 Starting **deep review** of $TOTAL_FILES files. This will read each file's diff, source, callers, and tests. Deep reviews take longer than normal reviews — expect this to run for a while depending on file count and complexity." || true
       env:
         GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}

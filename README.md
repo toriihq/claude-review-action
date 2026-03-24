@@ -225,6 +225,57 @@ Only `anthropic-api-key` is required. Everything else has sensible defaults.
 | `track-cost` | `true` | Append cost/turns/model to review comment |
 | `dismiss-previous-reviews` | `true` | Dismiss old Claude reviews before posting new one |
 
+### Deep Review
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `review-depth` | `normal` | `normal` (diff-first) or `deep` (per-file diffs + caller tracing) |
+| `deep-review-label` | `claude-deep-review` | Label that overrides depth to deep for a specific PR |
+| `deep-review-model` | `""` (same as `model`) | Optional model override for deep reviews |
+| `deep-max-files` | `50` | Skip deep review if PR exceeds this many files |
+| `deep-max-turns` | `50` | Claude turn limit for deep reviews |
+
+---
+
+## Deep Review Mode
+
+Deep review is an opt-in mode that gives Claude more context and a structured investigation protocol for each changed file. It reads per-file diffs, full source files, callers/importers, and tests — catching issues that a diff-only review would miss.
+
+### Normal vs Deep
+
+| | Normal | Deep |
+|---|---|---|
+| **What Claude sees** | Full diff inline in prompt | File manifest in prompt; per-file diffs read via tool calls |
+| **Context lines** | 3 (default `gh pr diff`) | 20 (`git diff -U20`) |
+| **Reads full source** | Only if diff is truncated | Always — for every changed file |
+| **Traces callers** | No | Yes — greps for importers, reads the most relevant ones |
+| **Checks tests** | No | Yes — reads corresponding test files |
+| **Speed** | Fast (few turns) | Slower (more turns, more tool calls) |
+| **Cost** | Lower | Higher (more turns + optionally a more capable model) |
+
+### When to use each
+
+**Normal review is enough for most PRs:**
+- Feature work, bug fixes, routine changes
+- PRs that stay within one module/domain
+- Config, documentation, style changes
+- Test-only PRs
+
+**Use deep review when a missed bug would be expensive:**
+- Refactors that change shared interfaces, function signatures, or types
+- Security-sensitive changes (auth, permissions, credentials, data access)
+- Data model or schema changes that affect multiple consumers
+- Cross-cutting concerns (middleware, base classes, shared utilities)
+- Large PRs where you want every file thoroughly investigated
+
+### How to trigger
+
+**Option A: Per-PR via label** (recommended) — Add a `claude-deep-review` label to any PR. The action detects the label and switches to deep mode for that review. To re-trigger, remove and re-add the label.
+
+**Option B: Always deep** — Set `review-depth: 'deep'` in your workflow. All reviews will use the deep protocol. Only recommended for small, high-risk repos.
+
+See [examples/deep-review.yml](examples/deep-review.yml) for a complete workflow example.
+
 ---
 
 ## Features
@@ -232,7 +283,8 @@ Only `anthropic-api-key` is required. Everything else has sensible defaults.
 - **3 trigger types** — Label, `@claude` in PR comments, `@claude` in inline review comments
 - **Re-review reconciliation** — Tracks previous findings, author responses, and new commits. Each HIGH/BLOCKER is marked FIXED, ACCEPTED, or STILL OPEN
 - **Relevant commit filtering** — Only flags commits that contribute real changes vs base
-- **Truncation awareness** — When diff exceeds limits, detects missing files, instructs Claude to spot-check, and requires disclosure in the verdict
+- **Deep review mode** — Per-file diffs with caller/test tracing for high-risk PRs (opt-in via label)
+- **Truncation awareness** — When diff exceeds limits, detects missing files, reads all of them via Read tool, and requires disclosure in the verdict
 - **PR size guard** — Skips reviews for PRs exceeding configurable file limits
 - **Cost tracking** — Appends cost, turns, and model to the review body
 - **Review dismissal** — Dismisses previous Claude reviews before posting new ones
