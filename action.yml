@@ -337,7 +337,7 @@ runs:
         show_full_output: true
         prompt: ${{ steps.build-security-prompt.outputs.prompt }}
         claude_args: |
-          --max-turns 20
+          --max-turns ${{ inputs.max-turns }}
           --model ${{ inputs.model }}
           --allowedTools "Bash,Read,Grep,Glob"
       env:
@@ -348,6 +348,7 @@ runs:
 
     - name: Post security failure check run
       if: inputs.review-mode == 'security' && steps.capture-context.outputs.skipped != 'true' && steps.claude-security-review.outcome == 'failure'
+      continue-on-error: true
       shell: bash
       run: bash ${{ github.action_path }}/scripts/post-security-failure.sh action-error
       env:
