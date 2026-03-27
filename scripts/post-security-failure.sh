@@ -36,6 +36,7 @@ jq -n \
 
 gh api "repos/${REPO:?REPO env var required}/check-runs" \
   --method POST \
-  --input /tmp/check-run-failure-payload.json > /dev/null || true
+  --input /tmp/check-run-failure-payload.json > /dev/null \
+  || echo "::warning::Failed to post neutral check run (${FAILURE_REASON})"
 
 echo "::warning::Security scan failed — posted neutral check run (${FAILURE_REASON})"
