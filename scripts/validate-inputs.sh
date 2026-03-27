@@ -3,7 +3,9 @@ set -euo pipefail
 
 post_error() {
   local msg="$1"
-  gh api "repos/$REPO/issues/$PR_NUMBER/comments" --method POST -f body="$msg" || true
+  if [ "${REVIEW_MODE:-review}" != "security" ]; then
+    gh api "repos/$REPO/issues/$PR_NUMBER/comments" --method POST -f body="$msg" || true
+  fi
 }
 
 # Check for missing API key
