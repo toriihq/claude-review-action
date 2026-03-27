@@ -416,7 +416,7 @@ runs:
         claude_args: |
           --max-turns ${{ inputs.max-turns }}
           --model ${{ inputs.model }}
-          --allowedTools "Bash,Read,Grep,Glob"
+          --allowedTools "Bash,Read,Write,Grep,Glob"
       env:
         REPO: ${{ github.repository }}
         HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
