@@ -178,7 +178,7 @@ runs:
         INCLUDE_PR_DESCRIPTION: ${{ inputs.include-pr-description }}
 
     - name: Adjust turns for truncated diffs
-      if: steps.capture-context.outputs.skipped != 'true' && steps.capture-context.outputs.missing_file_count != '0'
+      if: steps.capture-context.outputs.skipped != 'true' && steps.capture-context.outputs.missing_file_count != '0' && inputs.review-mode == 'review'
       id: adjust-turns
       shell: bash
       run: |
@@ -193,7 +193,7 @@ runs:
         BASE_TURNS: ${{ inputs.max-turns }}
 
     - name: Detect previous review
-      if: steps.capture-context.outputs.skipped != 'true'
+      if: steps.capture-context.outputs.skipped != 'true' && inputs.review-mode == 'review'
       id: detect-previous
       shell: bash
       run: bash ${{ github.action_path }}/scripts/detect-previous.sh
@@ -205,7 +205,7 @@ runs:
         SKIP_IF_ALREADY_REVIEWED: ${{ inputs.skip-if-already-reviewed }}
 
     - name: Fetch author comments
-      if: steps.capture-context.outputs.skipped != 'true' && steps.detect-previous.outputs.has_previous == 'true' && inputs.include-previous-review == 'true'
+      if: steps.capture-context.outputs.skipped != 'true' && steps.detect-previous.outputs.has_previous == 'true' && inputs.include-previous-review == 'true' && inputs.review-mode == 'review'
       id: fetch-comments
       shell: bash
       run: bash ${{ github.action_path }}/scripts/fetch-comments.sh
@@ -217,7 +217,7 @@ runs:
         TRIGGER_PHRASE: ${{ inputs.trigger-phrase }}
 
     - name: Build prompt
-      if: steps.capture-context.outputs.skipped != 'true'
+      if: steps.capture-context.outputs.skipped != 'true' && inputs.review-mode == 'review'
       id: build-prompt
       shell: bash
       run: bash ${{ github.action_path }}/scripts/build-prompt.sh
@@ -240,7 +240,7 @@ runs:
         FILE_COUNT: ${{ steps.capture-context.outputs.file_count }}
 
     - name: Run Claude Code Review
-      if: steps.capture-context.outputs.skipped != 'true'
+      if: steps.capture-context.outputs.skipped != 'true' && inputs.review-mode == 'review'
       id: claude-review
       continue-on-error: true
       uses: anthropics/claude-code-action@v1
@@ -258,7 +258,7 @@ runs:
           --allowedTools "${{ inputs.allowed-tools }}"
 
     - name: Post failure comment
-      if: steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'failure'
+      if: steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'failure' && inputs.review-mode == 'review'
       shell: bash
       run: bash ${{ github.action_path }}/scripts/post-failure.sh
       env:
@@ -270,7 +270,7 @@ runs:
         TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
 
     - name: Report cost
-      if: always() && steps.capture-context.outputs.skipped != 'true' && inputs.track-cost == 'true'
+      if: always() && steps.capture-context.outputs.skipped != 'true' && inputs.track-cost == 'true' && inputs.review-mode == 'review'
       shell: bash
       run: bash ${{ github.action_path }}/scripts/report-cost.sh
       env:
