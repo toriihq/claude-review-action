@@ -25,6 +25,18 @@ inputs:
     description: 'Appended to end of prompt (custom instructions)'
     required: false
     default: ''
+  review-mode:
+    description: "Mode of operation: 'review' (default — existing code review, posts PR review) or 'security' (security scan, posts GitHub Check Run, no PR comments)"
+    required: false
+    default: 'review'
+  security-guide-path:
+    description: 'Path to security review guide markdown (only used when review-mode is security)'
+    required: false
+    default: ''
+  blocking:
+    description: 'Security mode only. false = neutral check run (advisory); true = failure check run (blocks merge when findings exist)'
+    required: false
+    default: 'false'
   include-pr-description:
     description: 'Feed PR title+body into review prompt'
     required: false
