@@ -176,6 +176,7 @@ runs:
         MAX_DIFF_LINES: ${{ inputs.max-diff-lines }}
         MAX_DIFF_BYTES: ${{ inputs.max-diff-bytes }}
         INCLUDE_PR_DESCRIPTION: ${{ inputs.include-pr-description }}
+        REVIEW_MODE: ${{ inputs.review-mode }}
 
     - name: Adjust turns for truncated diffs
       if: steps.capture-context.outputs.skipped != 'true' && steps.capture-context.outputs.missing_file_count != '0' && inputs.review-mode == 'review'
