@@ -281,3 +281,77 @@ runs:
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         CLAUDE_OUTCOME: ${{ steps.claude-review.outcome }}
+
+    # ── Security Review Mode ──────────────────────────────────────────────────
+    # All steps below only run when review-mode == 'security'.
+    # Existing steps above continue to work exactly as before.
+
+    - name: Post security skip check run
+      if: inputs.review-mode == 'security' && steps.capture-context.outputs.skipped == 'true'
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/post-security-failure.sh too-large
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Fetch security guide
+      if: inputs.review-mode == 'security' && inputs.security-guide-path != '' && steps.capture-context.outputs.skipped != 'true'
+      continue-on-error: true
+      shell: bash
+      run: |
+        bash ${{ github.action_path }}/scripts/fetch-guide.sh
+        if [ -f /tmp/review-guide.md ]; then
+          mv /tmp/review-guide.md /tmp/security-guide.md
+        fi
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        GUIDE_PATH: ${{ inputs.security-guide-path }}
+        DEFAULT_BRANCH: ${{ inputs.default-branch }}
+
+    - name: Build security prompt
+      if: inputs.review-mode == 'security' && steps.capture-context.outputs.skipped != 'true'
+      id: build-security-prompt
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/build-security-prompt.sh
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
+        INCLUDE_PR_DESCRIPTION: ${{ inputs.include-pr-description }}
+        BLOCKING: ${{ inputs.blocking }}
+
+    - name: Run Claude Security Review
+      if: inputs.review-mode == 'security' && steps.capture-context.outputs.skipped != 'true'
+      id: claude-security-review
+      continue-on-error: true
+      uses: anthropics/claude-code-action@v1
+      with:
+        anthropic_api_key: ${{ inputs.anthropic-api-key }}
+        base_branch: ${{ inputs.default-branch || github.event.repository.default_branch }}
+        allowed_bots: ''
+        track_progress: false
+        show_full_output: true
+        prompt: ${{ steps.build-security-prompt.outputs.prompt }}
+        claude_args: |
+          --max-turns 20
+          --model ${{ inputs.model }}
+          --allowedTools "Bash,Read,Grep,Glob"
+      env:
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
+        GH_TOKEN: ${{ github.token }}
+        BLOCKING: ${{ inputs.blocking }}
+
+    - name: Post security failure check run
+      if: inputs.review-mode == 'security' && steps.capture-context.outputs.skipped != 'true' && steps.claude-security-review.outcome == 'failure'
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/post-security-failure.sh action-error
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
