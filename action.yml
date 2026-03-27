@@ -25,6 +25,18 @@ inputs:
     description: 'Appended to end of prompt (custom instructions)'
     required: false
     default: ''
+  review-mode:
+    description: "Mode of operation: 'review' (default — existing code review, posts PR review) or 'security' (security scan, posts GitHub Check Run, no PR comments)"
+    required: false
+    default: 'review'
+  security-guide-path:
+    description: 'Path to security review guide markdown (only used when review-mode is security)'
+    required: false
+    default: ''
+  blocking:
+    description: 'Security mode only. false = neutral check run (advisory); true = failure check run (blocks merge when findings exist)'
+    required: false
+    default: 'false'
   include-pr-description:
     description: 'Feed PR title+body into review prompt'
     required: false
@@ -158,6 +170,7 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         REVIEW_DEPTH: ${{ inputs.review-depth }}
+        REVIEW_MODE: ${{ inputs.review-mode }}
 
     - name: Checkout PR
       uses: actions/checkout@v4
@@ -225,9 +238,10 @@ runs:
         INCLUDE_PR_DESCRIPTION: ${{ inputs.include-pr-description }}
         REVIEW_DEPTH: ${{ steps.resolve-depth.outputs.effective_depth }}
         DEEP_MAX_FILES: ${{ inputs.deep-max-files }}
+        REVIEW_MODE: ${{ inputs.review-mode }}
 
     - name: Adjust turns for truncated diffs
-      if: steps.capture-context.outputs.skipped != 'true' && steps.capture-context.outputs.missing_file_count != '0'
+      if: steps.capture-context.outputs.skipped != 'true' && steps.capture-context.outputs.missing_file_count != '0' && inputs.review-mode == 'review'
       id: adjust-turns
       shell: bash
       run: |
@@ -242,7 +256,7 @@ runs:
         BASE_TURNS: ${{ steps.resolve-depth.outputs.effective_max_turns }}
 
     - name: Detect previous review
-      if: steps.capture-context.outputs.skipped != 'true'
+      if: steps.capture-context.outputs.skipped != 'true' && inputs.review-mode == 'review'
       id: detect-previous
       shell: bash
       run: bash ${{ github.action_path }}/scripts/detect-previous.sh
@@ -255,7 +269,7 @@ runs:
         REVIEW_DEPTH: ${{ steps.resolve-depth.outputs.effective_depth }}
 
     - name: Fetch author comments
-      if: steps.capture-context.outputs.skipped != 'true' && steps.detect-previous.outputs.has_previous == 'true' && inputs.include-previous-review == 'true'
+      if: steps.capture-context.outputs.skipped != 'true' && steps.detect-previous.outputs.has_previous == 'true' && inputs.include-previous-review == 'true' && inputs.review-mode == 'review'
       id: fetch-comments
       shell: bash
       run: bash ${{ github.action_path }}/scripts/fetch-comments.sh
@@ -281,7 +295,7 @@ runs:
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
 
     - name: Build prompt
-      if: steps.capture-context.outputs.skipped != 'true'
+      if: steps.capture-context.outputs.skipped != 'true' && inputs.review-mode == 'review'
       id: build-prompt
       shell: bash
       run: bash ${{ github.action_path }}/scripts/build-prompt.sh
@@ -305,7 +319,7 @@ runs:
         REVIEW_DEPTH: ${{ steps.resolve-depth.outputs.effective_depth }}
 
     - name: Run Claude Code Review
-      if: steps.capture-context.outputs.skipped != 'true'
+      if: steps.capture-context.outputs.skipped != 'true' && inputs.review-mode == 'review'
       id: claude-review
       continue-on-error: true
       uses: anthropics/claude-code-action@v1
@@ -323,7 +337,7 @@ runs:
           --allowedTools "${{ inputs.allowed-tools }}"
 
     - name: Post failure comment
-      if: steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'failure'
+      if: steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'failure' && inputs.review-mode == 'review'
       shell: bash
       run: bash ${{ github.action_path }}/scripts/post-failure.sh
       env:
@@ -335,7 +349,7 @@ runs:
         TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
 
     - name: Report cost
-      if: always() && steps.capture-context.outputs.skipped != 'true' && inputs.track-cost == 'true'
+      if: always() && steps.capture-context.outputs.skipped != 'true' && inputs.track-cost == 'true' && inputs.review-mode == 'review'
       shell: bash
       run: bash ${{ github.action_path }}/scripts/report-cost.sh
       env:
@@ -344,3 +358,78 @@ runs:
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         CLAUDE_OUTCOME: ${{ steps.claude-review.outcome }}
+
+    # ── Security Review Mode ──────────────────────────────────────────────────
+    # All steps below only run when review-mode == 'security'.
+    # Existing steps above continue to work exactly as before.
+
+    - name: Post security skip check run
+      if: inputs.review-mode == 'security' && steps.capture-context.outputs.skipped == 'true'
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/post-security-failure.sh too-large
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Fetch security guide
+      if: inputs.review-mode == 'security' && inputs.security-guide-path != '' && steps.capture-context.outputs.skipped != 'true'
+      continue-on-error: true
+      shell: bash
+      run: |
+        bash ${{ github.action_path }}/scripts/fetch-guide.sh
+        if [ -f /tmp/review-guide.md ]; then
+          mv /tmp/review-guide.md /tmp/security-guide.md
+        fi
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        GUIDE_PATH: ${{ inputs.security-guide-path }}
+        DEFAULT_BRANCH: ${{ inputs.default-branch }}
+
+    - name: Build security prompt
+      if: inputs.review-mode == 'security' && steps.capture-context.outputs.skipped != 'true'
+      id: build-security-prompt
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/build-security-prompt.sh
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
+        INCLUDE_PR_DESCRIPTION: ${{ inputs.include-pr-description }}
+        BLOCKING: ${{ inputs.blocking }}
+
+    - name: Run Claude Security Review
+      if: inputs.review-mode == 'security' && steps.capture-context.outputs.skipped != 'true'
+      id: claude-security-review
+      continue-on-error: true
+      uses: anthropics/claude-code-action@v1
+      with:
+        anthropic_api_key: ${{ inputs.anthropic-api-key }}
+        base_branch: ${{ inputs.default-branch || github.event.repository.default_branch }}
+        allowed_bots: ''
+        track_progress: false
+        show_full_output: true
+        prompt: ${{ steps.build-security-prompt.outputs.prompt }}
+        claude_args: |
+          --max-turns ${{ inputs.max-turns }}
+          --model ${{ inputs.model }}
+          --allowedTools "Bash,Read,Grep,Glob"
+      env:
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
+        GH_TOKEN: ${{ github.token }}
+        BLOCKING: ${{ inputs.blocking }}
+
+    - name: Post security failure check run
+      if: inputs.review-mode == 'security' && steps.capture-context.outputs.skipped != 'true' && steps.claude-security-review.outcome == 'failure'
+      continue-on-error: true
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/post-security-failure.sh action-error
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
