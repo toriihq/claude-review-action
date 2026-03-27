@@ -3,7 +3,9 @@ set -euo pipefail
 
 post_error() {
   local msg="$1"
-  gh api "repos/$REPO/issues/$PR_NUMBER/comments" --method POST -f body="$msg" || true
+  if [ "${REVIEW_MODE:-review}" != "security" ]; then
+    gh api "repos/$REPO/issues/$PR_NUMBER/comments" --method POST -f body="$msg" || true
+  fi
 }
 
 # Check for missing API key
@@ -31,6 +33,21 @@ case "${REVIEW_AUTHORITY:-}" in
 MSG
 )"
     echo "::error::Invalid review-authority: '${REVIEW_AUTHORITY}'. Must be one of: comment-only, request-changes, full."
+    exit 1
+    ;;
+esac
+
+# Check for valid review depth
+case "${REVIEW_DEPTH:-normal}" in
+  normal|deep) ;;
+  *)
+    post_error "$(cat <<MSG
+❌ **Claude Review failed — invalid configuration**
+
+\`review-depth: '${REVIEW_DEPTH}'\` is not valid. Must be one of: \`normal\`, \`deep\`.
+MSG
+)"
+    echo "::error::Invalid review-depth: '${REVIEW_DEPTH}'. Must be one of: normal, deep."
     exit 1
     ;;
 esac
