@@ -368,7 +368,7 @@ runs:
       shell: bash
       run: bash ${{ github.action_path }}/scripts/post-security-failure.sh too-large
       env:
-        GH_TOKEN: ${{ github.token }}
+        SECURITY_GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
         HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -420,7 +420,7 @@ runs:
       env:
         REPO: ${{ github.repository }}
         HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
-        GH_TOKEN: ${{ github.token }}
+        SECURITY_GH_TOKEN: ${{ github.token }}
         BLOCKING: ${{ inputs.blocking }}
 
     - name: Post security failure check run
@@ -429,7 +429,7 @@ runs:
       shell: bash
       run: bash ${{ github.action_path }}/scripts/post-security-failure.sh action-error
       env:
-        GH_TOKEN: ${{ github.token }}
+        SECURITY_GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
         HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
