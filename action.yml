@@ -7,10 +7,15 @@ branding:
   color: 'purple'
 
 inputs:
-  # Required
+  # Authentication (provide one)
   anthropic-api-key:
     description: 'Anthropic API key'
-    required: true
+    required: false
+    default: ''
+  claude-code-oauth-token:
+    description: 'Claude Code OAuth token (alternative to anthropic-api-key)'
+    required: false
+    default: ''
 
   # Review Content
   review-guide-path:
@@ -130,6 +135,7 @@ runs:
       run: bash ${{ github.action_path }}/scripts/validate-inputs.sh
       env:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
         REVIEW_AUTHORITY: ${{ inputs.review-authority }}
         GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
@@ -234,6 +240,7 @@ runs:
       uses: anthropics/claude-code-action@v1
       with:
         anthropic_api_key: ${{ inputs.anthropic-api-key }}
+        claude_code_oauth_token: ${{ inputs.claude-code-oauth-token }}
         base_branch: ${{ inputs.default-branch || github.event.repository.default_branch }}
         allowed_bots: ''
         track_progress: false
