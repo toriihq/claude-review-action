@@ -19,7 +19,29 @@ if [ -f "$OUTPUT_FILE" ]; then
       ;;
   esac
 else
-  BODY="❌ Review failed — no execution output produced. This usually means the workflow file on this branch differs from the default branch. Check the [workflow run](${RUN_URL})."
+  # No output file — the SDK likely crashed before producing output (e.g. credit errors, auth errors).
+  # Try to extract the actual error from the current job's check-run annotations.
+  SDK_ERROR=""
+  if [ -n "${GITHUB_RUN_ID:-}" ] && [ -n "${REPO:-}" ]; then
+    JOB_ID=$(gh api "repos/${REPO}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+      --jq ".jobs[] | select(.name == \"${GITHUB_JOB:-claude-review}\") | .id" 2>/dev/null || true)
+    if [ -n "$JOB_ID" ]; then
+      RAW_ERROR=$(gh api "repos/${REPO}/check-runs/${JOB_ID}/annotations" \
+        --jq '[.[] | select(.annotation_level == "failure") | .message] | last // empty' 2>/dev/null || true)
+      # Strip nested prefixes to get the core error message
+      SDK_ERROR=$(echo "$RAW_ERROR" \
+        | sed 's/^Action failed with error: //' \
+        | sed 's/^SDK execution error: //' \
+        | sed 's/^Error: //' \
+        | sed 's/^Claude Code returned an error result: //')
+    fi
+  fi
+
+  if [ -n "$SDK_ERROR" ]; then
+    BODY="❌ Review failed — ${SDK_ERROR}. Check the [workflow run](${RUN_URL}) for details."
+  else
+    BODY="❌ Review failed — no execution output produced. This usually means the workflow file on this branch differs from the default branch. Check the [workflow run](${RUN_URL})."
+  fi
 fi
 
 gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY" || true
