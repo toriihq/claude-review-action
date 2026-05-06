@@ -231,15 +231,15 @@ runs:
       if: steps.capture-context.outputs.skipped != 'true'
       shell: bash
       run: |
-        case "$(uname -m)" in
-          arm64|aarch64) arch="arm64" ;;
-          *) arch="x64" ;;
-        esac
-        LATEST=$(curl -fsSL https://downloads.claude.ai/claude-code-releases/latest)
-        mkdir -p "$HOME/.local/bin"
-        curl -fsSL "https://downloads.claude.ai/claude-code-releases/$LATEST/linux-${arch}/claude" \
-          -o "$HOME/.local/bin/claude"
-        chmod +x "$HOME/.local/bin/claude"
+        curl -fsSL https://claude.ai/install.sh | bash -s -- || true
+        if [[ ! -x "$HOME/.local/bin/claude" ]]; then
+          case "$(uname -m)" in arm64|aarch64) arch="arm64" ;; *) arch="x64" ;; esac
+          LATEST=$(curl -fsSL https://downloads.claude.ai/claude-code-releases/latest)
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL "https://downloads.claude.ai/claude-code-releases/$LATEST/linux-${arch}/claude" \
+            -o "$HOME/.local/bin/claude"
+          chmod +x "$HOME/.local/bin/claude"
+        fi
         echo "PATH_TO_CLAUDE_CODE_EXECUTABLE=$HOME/.local/bin/claude" >> "$GITHUB_ENV"
 
     - name: Run Claude Code Review
