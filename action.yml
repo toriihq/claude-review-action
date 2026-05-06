@@ -227,6 +227,21 @@ runs:
         DISMISS_PREVIOUS_REVIEWS: ${{ inputs.dismiss-previous-reviews }}
         FILE_COUNT: ${{ steps.capture-context.outputs.file_count }}
 
+    - name: Pre-install Claude Code
+      if: steps.capture-context.outputs.skipped != 'true'
+      shell: bash
+      run: |
+        case "$(uname -m)" in
+          arm64|aarch64) arch="arm64" ;;
+          *) arch="x64" ;;
+        esac
+        LATEST=$(curl -fsSL https://downloads.claude.ai/claude-code-releases/latest)
+        mkdir -p "$HOME/.local/bin"
+        curl -fsSL "https://downloads.claude.ai/claude-code-releases/$LATEST/linux-${arch}/claude" \
+          -o "$HOME/.local/bin/claude"
+        chmod +x "$HOME/.local/bin/claude"
+        echo "PATH_TO_CLAUDE_CODE_EXECUTABLE=$HOME/.local/bin/claude" >> "$GITHUB_ENV"
+
     - name: Run Claude Code Review
       if: steps.capture-context.outputs.skipped != 'true'
       id: claude-review
