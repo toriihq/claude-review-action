@@ -231,15 +231,22 @@ runs:
       if: steps.capture-context.outputs.skipped != 'true'
       shell: bash
       run: |
-        curl -fsSL https://claude.ai/install.sh | bash -s -- || true
-        if [[ ! -x "$HOME/.local/bin/claude" ]]; then
-          case "$(uname -m)" in arm64|aarch64) arch="arm64" ;; *) arch="x64" ;; esac
-          LATEST=$(curl -fsSL https://downloads.claude.ai/claude-code-releases/latest)
-          mkdir -p "$HOME/.local/bin"
-          curl -fsSL "https://downloads.claude.ai/claude-code-releases/$LATEST/linux-${arch}/claude" \
-            -o "$HOME/.local/bin/claude"
-          chmod +x "$HOME/.local/bin/claude"
+        set -euo pipefail
+        if [[ "$(uname -s)" != "Linux" ]]; then
+          echo "::error::Pre-install Claude Code only supports Linux runners"; exit 1
         fi
+        case "$(uname -m)" in
+          arm64|aarch64) arch="arm64" ;;
+          x86_64|x64)   arch="x64" ;;
+          *) echo "::error::Unsupported arch: $(uname -m)"; exit 1 ;;
+        esac
+        VERSION=$(curl -fsSL https://downloads.claude.ai/claude-code-releases/latest)
+        echo "::notice::Installing Claude Code $VERSION (linux-$arch)"
+        mkdir -p "$HOME/.local/bin"
+        curl -fsSL "https://downloads.claude.ai/claude-code-releases/$VERSION/linux-${arch}/claude" \
+          -o "$HOME/.local/bin/claude"
+        chmod +x "$HOME/.local/bin/claude"
+        echo "Installed binary SHA256: $(sha256sum "$HOME/.local/bin/claude" | cut -d' ' -f1)"
         echo "PATH_TO_CLAUDE_CODE_EXECUTABLE=$HOME/.local/bin/claude" >> "$GITHUB_ENV"
 
     - name: Run Claude Code Review
