@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Truncated-diff fallback reviewed whole files at HEAD, not their changes. The full diff is now split per file into `/tmp/pr-diffs/<path>.diff` and Claude is pointed at those, so removed lines and deleted files are covered.
+- The file cut mid-way by truncation was counted as included, silently dropping its later hunks. It is now listed as missing.
+- The missing-file list is derived from the diff itself (new paths), so renamed files are no longer always reported missing.
+
 ## [1.0.1] - 2026-03-12
 
 ### Fixed
