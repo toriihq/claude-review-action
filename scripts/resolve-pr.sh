@@ -2,10 +2,12 @@
 set -euo pipefail
 
 # Resolve PR number, SHA, event type, and user comment from any trigger type.
-# Inputs (env vars): EVENT_NAME, EVENT_JSON, GH_TOKEN, GITHUB_REPOSITORY
-# Outputs (GITHUB_OUTPUT): pr_number, pr_sha, event_type, user_comment
+# Inputs (env vars): EVENT_NAME, GITHUB_EVENT_PATH, GH_TOKEN, GITHUB_REPOSITORY
+# Outputs (GITHUB_OUTPUT): pr_number, pr_sha, event_type
+# Outputs (files): /tmp/user-comment.txt
 
-EVENT=$(echo "$EVENT_JSON" | jq -r '.')
+# Read the event from the runner's file, not an env var — a big PR body/comment would exceed Linux's 128 KB per-env-var limit
+EVENT=$(jq -r '.' "${GITHUB_EVENT_PATH:?}")
 
 case "$EVENT_NAME" in
   pull_request)
@@ -34,11 +36,7 @@ echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 echo "pr_sha=$PR_SHA" >> "$GITHUB_OUTPUT"
 echo "event_type=$EVENT_NAME" >> "$GITHUB_OUTPUT"
 
-# User comment may be multiline — use heredoc delimiter
-{
-  echo 'user_comment<<__GHA_COMMENT_EOF__'
-  echo "$USER_COMMENT"
-  echo '__GHA_COMMENT_EOF__'
-} >> "$GITHUB_OUTPUT"
+# File, not an output: an output would reach build-prompt as an env var, and a fixed heredoc delimiter is injectable
+printf '%s\n' "$USER_COMMENT" > /tmp/user-comment.txt
 
 echo "::notice::Resolved PR #$PR_NUMBER (SHA: ${PR_SHA:0:7}, event: $EVENT_NAME)"

@@ -4,6 +4,8 @@
 
 ### Fixed
 - Large prompts failed before Claude started ("Argument list too long"): the prompt is passed as one env var and Linux caps each at 128 KB. When the JSON-escaped prompt would exceed `max-prompt-bytes` (default 120000), the diff is now saved to `/tmp/pr-diff.txt` for Claude to Read instead of inlined. If the prompt is still too big without the diff, the review is skipped with a PR comment and a failed job (and a neutral check with `post-check-run`).
+- The first step received the whole event (`toJSON(github.event)`) as an env var, so a PR body or comment over ~128 KB (possible with non-ASCII text) failed the run before anything else. The event is now read from `$GITHUB_EVENT_PATH`, and the user comment reaches `build-prompt.sh` through a file instead of an output/env var.
+- The `user_comment` output used a fixed heredoc delimiter (`__GHA_COMMENT_EOF__`) that a commenter could type to inject outputs; it is no longer an output.
 - The `prompt` output heredoc used a guessable delimiter (`EOF_PROMPT_<run id>`); PR text containing it could end the output early. It is now random.
 
 ### Added

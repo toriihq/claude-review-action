@@ -2,10 +2,11 @@
 set -euo pipefail
 
 # Assemble the full review prompt from inputs, captured context, and templates.
-# Inputs (env vars): ACTION_PATH, REPO, PR_NUMBER, EVENT_TYPE, USER_COMMENT,
+# Inputs (env vars): ACTION_PATH, REPO, PR_NUMBER, EVENT_TYPE,
 #   HAS_PREVIOUS, NEW_COMMITS, INCLUDE_PREVIOUS_REVIEW, CONTEXT_INTRO, CRITICAL_RULES,
 #   EXTRA_PROMPT, REVIEW_AUTHORITY, APPROVE_THRESHOLD, APPROVE_MAX_FILES,
 #   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT, MAX_PROMPT_BYTES
+# Inputs (files): /tmp/user-comment.txt (comment triggers)
 # Outputs (GITHUB_OUTPUT): prompt
 
 PROMPT_FILE="/tmp/claude-prompt.md"
@@ -41,10 +42,9 @@ fi
 
 # --- Section 4: User comment + routing (if comment trigger) ---
 if [ "$EVENT_TYPE" = "issue_comment" ] || [ "$EVENT_TYPE" = "pull_request_review_comment" ]; then
+  printf '\n## USER COMMENT:\n' >> "$PROMPT_FILE"
+  cat /tmp/user-comment.txt >> "$PROMPT_FILE"
   cat >> "$PROMPT_FILE" <<COMMENT_END
-
-## USER COMMENT:
-${USER_COMMENT}
 
 If the user is asking for a code review, follow the REVIEW FORMAT and CRITICAL RULES below.
 If the user is asking a question or making a specific request, respond to their message directly — use the PR diff and codebase for context, but skip the formal review format. Submit your response using:

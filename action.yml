@@ -141,7 +141,6 @@ runs:
         GH_TOKEN: ${{ github.token }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         EVENT_NAME: ${{ github.event_name }}
-        EVENT_JSON: ${{ toJSON(github.event) }}
 
     - name: Validate inputs
       shell: bash
@@ -232,7 +231,6 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         EVENT_TYPE: ${{ steps.resolve-pr.outputs.event_type }}
-        USER_COMMENT: ${{ steps.resolve-pr.outputs.user_comment }}
         HAS_PREVIOUS: ${{ steps.detect-previous.outputs.has_previous }}
         NEW_COMMITS: ${{ steps.detect-previous.outputs.commits }}
         INCLUDE_PREVIOUS_REVIEW: ${{ inputs.include-previous-review }}
