@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.2.1] - 2026-10-01
 
 ### Fixed
 - Large prompts failed before Claude started ("Argument list too long"): the prompt is passed as one env var and Linux caps each at 128 KB. When the JSON-escaped prompt would exceed `max-prompt-bytes` (default 120000), the diff is now saved to `/tmp/pr-diff.txt` for Claude to Read instead of inlined. If the prompt is still too big without the diff, the review is skipped with a PR comment and a failed job (and a neutral check with `post-check-run`).
