@@ -85,17 +85,17 @@ if [ -s /tmp/truncated-files.txt ]; then
 ## ⚠️ DIFF TRUNCATED — ${MISSING_COUNT} files not shown
 
 The following files are part of this PR but were cut off by the diff size limit.
-You MUST read and review ALL of these files using the Read tool before submitting your review.
+You MUST Read the saved diff (path after →) of ALL of these files before submitting your review — review the change, not just the file. Read the source file too when you need context.
 Prioritize reading order by risk:
 1. Files matching CRITICAL RULES patterns (routes, DB queries, Lambda invokes)
 2. Files with security-sensitive names (auth, permissions, secrets, credentials)
 3. New files (more likely to have issues than modifications)
 4. All remaining files
 
-**Files not in diff:**
+**Files not (fully) in diff:**
 TRUNC_HEADER
   while IFS= read -r file; do
-    echo "- \`$file\`" >> "$PROMPT_FILE"
+    echo "- \`$file\` → \`/tmp/pr-diffs/$file.diff\`" >> "$PROMPT_FILE"
   done < /tmp/truncated-files.txt
 fi
 
