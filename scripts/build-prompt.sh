@@ -5,10 +5,12 @@ set -euo pipefail
 # Inputs (env vars): ACTION_PATH, REPO, PR_NUMBER, EVENT_TYPE, USER_COMMENT,
 #   HAS_PREVIOUS, NEW_COMMITS, INCLUDE_PREVIOUS_REVIEW, CONTEXT_INTRO, CRITICAL_RULES,
 #   EXTRA_PROMPT, REVIEW_AUTHORITY, APPROVE_THRESHOLD, APPROVE_MAX_FILES,
-#   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT
+#   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT, MAX_PROMPT_BYTES
 # Outputs (GITHUB_OUTPUT): prompt
 
 PROMPT_FILE="/tmp/claude-prompt.md"
+# The prompt reaches claude-code-action as one env var (and JSON-escaped in ALL_INPUTS); big ones fail with E2BIG
+MAX_PROMPT_BYTES="${MAX_PROMPT_BYTES:-120000}"
 
 # --- Sections 1+2: Context intro + PR_NUMBER/REPO (merged into one heredoc) ---
 cat > "$PROMPT_FILE" <<INTRO_END
@@ -71,11 +73,11 @@ cat >> "$PROMPT_FILE" <<'DIFF_HEADER'
 ---
 
 ## PR DIFF:
-```diff
 DIFF_HEADER
 
-cat /tmp/pr-diff.txt >> "$PROMPT_FILE"
-echo '```' >> "$PROMPT_FILE"
+# Placeholder line — spliced at the end with the inline diff, or a pointer to the file when the prompt would be too big
+echo "(PR diff)" >> "$PROMPT_FILE"
+DIFF_LINE=$(wc -l < "$PROMPT_FILE" | tr -d ' ')
 
 # --- Section 7b: Truncated files list (if diff was truncated) ---
 if [ -s /tmp/truncated-files.txt ]; then
@@ -106,7 +108,7 @@ if [ "$HAS_PREVIOUS" = "true" ] && [ -n "$NEW_COMMITS" ]; then
 ## FOCUS: This is a re-review. New commits since last review:
 ${NEW_COMMITS}
 
-Prioritize reviewing the new commits, but use the full diff above for context.
+Prioritize reviewing the new commits, but use the full diff for context.
 FOCUS_END
 fi
 
@@ -216,11 +218,36 @@ if [ -n "$EXTRA_PROMPT" ]; then
   echo "$EXTRA_PROMPT" >> "$PROMPT_FILE"
 fi
 
+# --- Resolve the diff placeholder ---
+# Replace line DIFF_LINE of the prompt with stdin (by line number, so prompt text can't fake the placeholder)
+splice() { head -n $((DIFF_LINE - 1)) "$PROMPT_FILE"; cat; tail -n +$((DIFF_LINE + 1)) "$PROMPT_FILE"; }
+# Size as claude-code-action's ALL_INPUTS carries it (JSON-escaped) — always larger than the raw prompt
+escaped_bytes() { jq -Rs . "$1" | wc -c | tr -d ' '; }
+
+{ echo '```diff'; cat /tmp/pr-diff.txt; [ -z "$(tail -c 1 /tmp/pr-diff.txt)" ] || echo; echo '```'; } | splice > "$PROMPT_FILE.next"
+if [ "$(escaped_bytes "$PROMPT_FILE.next")" -gt "$MAX_PROMPT_BYTES" ]; then
+  DIFF_BYTES=$(wc -c < /tmp/pr-diff.txt | tr -d ' ')
+  echo "::notice::Diff (${DIFF_BYTES} bytes) moved out of the prompt to /tmp/pr-diff.txt — prompt would exceed ${MAX_PROMPT_BYTES} bytes"
+  printf '%s\n' "The diff ($(wc -l < /tmp/pr-diff.txt | tr -d ' ') lines, ${DIFF_BYTES} bytes) is too large to include here. It is saved at \`/tmp/pr-diff.txt\`. You MUST Read ALL of it (page with offset/limit) before submitting your review." \
+    | splice > "$PROMPT_FILE.next"
+fi
+mv "$PROMPT_FILE.next" "$PROMPT_FILE"
+
+PROMPT_BYTES=$(escaped_bytes "$PROMPT_FILE")
+if [ "$PROMPT_BYTES" -gt "$MAX_PROMPT_BYTES" ]; then
+  gh pr comment "$PR_NUMBER" --repo "$REPO" \
+    --body "⚠️ **Claude review skipped** — the review prompt is ${PROMPT_BYTES} bytes even without the diff (limit ${MAX_PROMPT_BYTES}). The PR description, review guide, previous review and author comments together are too long — shorten the description or review manually." || true
+  echo "::error::Prompt is ${PROMPT_BYTES} bytes (JSON-escaped) without the diff — over ${MAX_PROMPT_BYTES}"
+  exit 1
+fi
+
 # --- Export prompt as GitHub Actions output ---
 {
-  echo "prompt<<EOF_PROMPT_${GITHUB_RUN_ID}"
+  # Random delimiter — PR-controlled text could otherwise end the heredoc and set other outputs
+  DELIM="EOF_PROMPT_$(openssl rand -hex 16)"
+  echo "prompt<<${DELIM}"
   cat "$PROMPT_FILE"
-  echo "EOF_PROMPT_${GITHUB_RUN_ID}"
+  echo "${DELIM}"
 } >> "$GITHUB_OUTPUT"
 
 echo "::notice::Prompt assembled ($(wc -c < "$PROMPT_FILE" | tr -d ' ') bytes)"

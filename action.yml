@@ -47,6 +47,10 @@ inputs:
     description: 'Truncate diff after N bytes'
     required: false
     default: '80000'
+  max-prompt-bytes:
+    description: 'Move the diff out of the prompt into a file Claude reads when the JSON-escaped prompt would exceed N bytes (Linux caps one env var at 128 KB)'
+    required: false
+    default: '120000'
   max-turns:
     description: 'Claude conversation turn limit'
     required: false
@@ -240,6 +244,7 @@ runs:
         APPROVE_MAX_FILES: ${{ inputs.approve-max-files }}
         DISMISS_PREVIOUS_REVIEWS: ${{ inputs.dismiss-previous-reviews }}
         FILE_COUNT: ${{ steps.capture-context.outputs.file_count }}
+        MAX_PROMPT_BYTES: ${{ inputs.max-prompt-bytes }}
 
     - name: Run Claude Code Review
       if: steps.capture-context.outputs.skipped != 'true'
@@ -283,7 +288,7 @@ runs:
         CLAUDE_OUTCOME: ${{ steps.claude-review.outcome }}
 
     - name: Post review failure check
-      if: always() && inputs.post-check-run == 'true' && (steps.capture-context.outputs.skipped == 'true' || steps.claude-review.outcome == 'failure' || steps.claude-review.outcome == 'cancelled')
+      if: always() && inputs.post-check-run == 'true' && (steps.capture-context.outputs.skipped == 'true' || steps.build-prompt.outcome == 'failure' || steps.claude-review.outcome == 'failure' || steps.claude-review.outcome == 'cancelled')
       shell: bash
       run: |
         if [ "$SKIPPED" = "true" ]; then

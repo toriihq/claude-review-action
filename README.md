@@ -182,6 +182,7 @@ Only `anthropic-api-key` is required. Everything else has sensible defaults.
 | `max-files` | `50` | Skip review if PR exceeds this many files |
 | `max-diff-lines` | `3000` | Truncate diff after N lines |
 | `max-diff-bytes` | `80000` | Truncate diff after N bytes |
+| `max-prompt-bytes` | `120000` | Above this, the diff is saved to `/tmp/pr-diff.txt` for Claude to Read instead of inlined (Linux caps one env var at 128 KB) |
 | `max-turns` | `30` | Claude conversation turn limit |
 | `timeout-minutes` | `20` | Informational — set actual timeout on your job |
 
