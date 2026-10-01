@@ -10,7 +10,7 @@ if [ "$CLAUDE_OUTCOME" != "success" ]; then
   exit 0
 fi
 
-OUTPUT_FILE="/home/runner/work/_temp/claude-execution-output.json"
+OUTPUT_FILE="${CLAUDE_OUTPUT_FILE:-}"
 
 if [ ! -f "$OUTPUT_FILE" ]; then
   echo "::notice::No execution output file found — skipping cost report"

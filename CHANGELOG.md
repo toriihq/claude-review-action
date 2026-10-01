@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- When `claude-code-action` skipped itself (e.g. the branch's workflow file differs from the default branch), its step still reported success and the job went green with no review. The action now detects the missing execution output, comments on the PR and fails the job. Real Claude failures keep their current behaviour.
+
 ## [1.0.1] - 2026-03-12
 
 ### Fixed
