@@ -263,11 +263,14 @@ runs:
           --model ${{ inputs.model }}
           --allowedTools "${{ inputs.allowed-tools }}"
 
-    - name: Post failure comment
-      if: steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'failure'
+    - name: Verify review ran / post failure comment
+      if: always() && steps.capture-context.outputs.skipped != 'true' && (steps.claude-review.outcome == 'failure' || steps.claude-review.outcome == 'success')
+      id: post-failure
       shell: bash
       run: bash ${{ github.action_path }}/scripts/post-failure.sh
       env:
+        CLAUDE_OUTCOME: ${{ steps.claude-review.outcome }}
+        CLAUDE_OUTPUT_FILE: ${{ steps.claude-review.outputs.execution_file }}
         GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
@@ -285,9 +288,10 @@ runs:
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         CLAUDE_OUTCOME: ${{ steps.claude-review.outcome }}
+        CLAUDE_OUTPUT_FILE: ${{ steps.claude-review.outputs.execution_file }}
 
     - name: Post review failure check
-      if: always() && inputs.post-check-run == 'true' && (steps.capture-context.outputs.skipped == 'true' || steps.build-prompt.outcome == 'failure' || steps.claude-review.outcome == 'failure' || steps.claude-review.outcome == 'cancelled')
+      if: always() && inputs.post-check-run == 'true' && (steps.capture-context.outputs.skipped == 'true' || steps.build-prompt.outcome == 'failure' || steps.claude-review.outcome == 'failure' || steps.claude-review.outcome == 'cancelled' || steps.post-failure.outputs.did_not_run == 'true')
       shell: bash
       run: |
         if [ "$SKIPPED" = "true" ]; then
@@ -304,7 +308,7 @@ runs:
         SKIPPED: ${{ steps.capture-context.outputs.skipped }}
 
     - name: Post check run
-      if: always() && inputs.post-check-run == 'true' && steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'success'
+      if: always() && inputs.post-check-run == 'true' && steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'success' && steps.post-failure.outputs.did_not_run != 'true'
       shell: bash
       run: bash ${{ github.action_path }}/scripts/post-check-run.sh
       env:

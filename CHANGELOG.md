@@ -7,6 +7,10 @@
 - The first step received the whole event (`toJSON(github.event)`) as an env var, so a PR body or comment over ~128 KB (possible with non-ASCII text) failed the run before anything else. The event is now read from `$GITHUB_EVENT_PATH`, and the user comment reaches `build-prompt.sh` through a file instead of an output/env var.
 - The `user_comment` output used a fixed heredoc delimiter (`__GHA_COMMENT_EOF__`) that a commenter could type to inject outputs; it is no longer an output.
 - The `prompt` output heredoc used a guessable delimiter (`EOF_PROMPT_<run id>`); PR text containing it could end the output early. It is now random.
+- When `claude-code-action` skipped itself (e.g. the branch's workflow file differs from the default branch), its step still reported success and the job went green with no review. The action now detects the missing execution output, comments on the PR and fails the job. Real Claude failures keep their current behaviour.
+- Truncated-diff fallback reviewed whole files at HEAD, not their changes. The full diff is now split per file into `/tmp/pr-diffs/<path>.diff` and Claude is pointed at those, so removed lines and deleted files are covered.
+- The file cut mid-way by truncation was counted as included, silently dropping its later hunks. It is now listed as missing.
+- The missing-file list is derived from the diff itself (new paths), so renamed files are no longer always reported missing.
 
 ### Added
 - `max-prompt-bytes` input.
