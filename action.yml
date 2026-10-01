@@ -227,6 +227,7 @@ runs:
       shell: bash
       run: bash ${{ github.action_path }}/scripts/build-prompt.sh
       env:
+        GH_TOKEN: ${{ github.token }}
         ACTION_PATH: ${{ github.action_path }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
