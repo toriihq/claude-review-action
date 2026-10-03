@@ -32,10 +32,15 @@ jobs:
     steps:
       - uses: toriihq/claude-review-action@v1
         with:
+          # Use one of the two authentication methods:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Or use an OAuth token instead:
+          # claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
-**2. Add your API key** — Go to repo **Settings > Secrets > Actions** and add `ANTHROPIC_API_KEY` ([get one here](https://console.anthropic.com))
+**2. Add authentication** — Go to repo **Settings > Secrets > Actions** and add one of:
+- `ANTHROPIC_API_KEY` — an Anthropic API key ([get one here](https://console.anthropic.com)), or
+- `CLAUDE_CODE_OAUTH_TOKEN` — a Claude Code OAuth token (from Claude Code's `/login` command)
 
 **3. Install the Claude GitHub App** — run `/install-github-app` in Claude Code, or follow the [claude-code-action setup](https://github.com/anthropics/claude-code-action#setup)
 
@@ -163,7 +168,16 @@ Also available as copyable files: [minimal.yml](examples/minimal.yml), [standard
 
 ## All Inputs
 
-Only `anthropic-api-key` is required. Everything else has sensible defaults.
+You must provide one of `anthropic-api-key` or `claude-code-oauth-token`. Everything else has sensible defaults.
+
+### Authentication
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `anthropic-api-key` | `""` | Anthropic API key |
+| `claude-code-oauth-token` | `""` | Claude Code OAuth token (alternative to API key) |
+
+Provide **one** of the two. If neither is set, the action fails with a clear error. When using an OAuth token, API key validation is skipped.
 
 ### Review Content
 
