@@ -25,6 +25,14 @@ inputs:
     description: 'Appended to end of prompt (custom instructions)'
     required: false
     default: ''
+  include-architecture-review:
+    description: 'After the code review, post a separate COMMENT review that is only the architecture checklist. It does not approve, request changes, or change the code review.'
+    required: false
+    default: 'false'
+  architecture-guide-path:
+    description: 'Path to a repo markdown file of what the architecture section should look for. Empty = the action generic guide. Ignored unless include-architecture-review is true.'
+    required: false
+    default: ''
   include-pr-description:
     description: 'Feed PR title+body into review prompt'
     required: false
@@ -169,6 +177,18 @@ runs:
         GUIDE_PATH: ${{ inputs.review-guide-path }}
         DEFAULT_BRANCH: ${{ inputs.default-branch }}
 
+    - name: Fetch architecture guide
+      if: inputs.include-architecture-review == 'true' && inputs.architecture-guide-path != ''
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/fetch-guide.sh
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        GUIDE_PATH: ${{ inputs.architecture-guide-path }}
+        GUIDE_OUT: /tmp/architecture-guide.md
+        GUIDE_PR_COPY: /tmp/architecture-guide-pr-branch.md
+        DEFAULT_BRANCH: ${{ inputs.default-branch }}
+
     - name: Capture context
       id: capture-context
       shell: bash
@@ -238,6 +258,7 @@ runs:
         CONTEXT_INTRO: ${{ inputs.context-intro }}
         CRITICAL_RULES: ${{ inputs.critical-rules }}
         EXTRA_PROMPT: ${{ inputs.extra-prompt }}
+        INCLUDE_ARCHITECTURE_REVIEW: ${{ inputs.include-architecture-review }}
         REVIEW_AUTHORITY: ${{ inputs.review-authority }}
         APPROVE_THRESHOLD: ${{ inputs.approve-threshold }}
         APPROVE_MAX_FILES: ${{ inputs.approve-max-files }}
@@ -262,6 +283,23 @@ runs:
           --max-turns ${{ steps.adjust-turns.outputs.adjusted_max_turns || inputs.max-turns }}
           --model ${{ inputs.model }}
           --allowedTools "${{ inputs.allowed-tools }}"
+
+    - name: Architecture review
+      if: inputs.include-architecture-review == 'true' && steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'success'
+      shell: bash
+      run: |
+        if ! command -v claude >/dev/null 2>&1; then
+          npm install -g @anthropic-ai/claude-code
+        fi
+        bash ${{ github.action_path }}/scripts/architecture-review.sh
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        ACTION_PATH: ${{ github.action_path }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        MODEL: ${{ inputs.model }}
+        GH_TOKEN: ${{ github.token }}
+        CI: 'true'
 
     - name: Verify review ran / post failure comment
       if: always() && steps.capture-context.outputs.skipped != 'true' && (steps.claude-review.outcome == 'failure' || steps.claude-review.outcome == 'success')

@@ -173,6 +173,8 @@ Only `anthropic-api-key` is required. Everything else has sensible defaults.
 | `critical-rules` | `""` | Multiline string injected as BLOCKER-level rules |
 | `review-guide-path` | `""` | Path to repo's review guide markdown |
 | `extra-prompt` | `""` | Custom instructions appended to end of prompt |
+| `include-architecture-review` | `false` | Advisory `## 🏗️ Architecture` section. Never changes the Verdict or the review event |
+| `architecture-guide-path` | `""` | What that section looks for. Empty uses the action's generic guide. Ignored unless `include-architecture-review` is true |
 | `include-pr-description` | `true` | Feed PR title+body into review prompt |
 
 ### Limits
@@ -208,6 +210,21 @@ Only `anthropic-api-key` is required. Everything else has sensible defaults.
 | `comment-only` | No | No | Advisory only — never blocks PRs |
 | `request-changes` | Yes | No | Blocks on blockers/high. **Default.** |
 | `full` | Yes | Yes (guarded) | Can also APPROVE clean PRs, gated by threshold + file count |
+
+### Architecture recommendations (opt-in)
+
+```yaml
+include-architecture-review: 'true'
+```
+
+Posts a second review, event `COMMENT`, after the code review. The code review does not include it, and dismissing previous code reviews leaves it in place. The body is a checklist: one line per item in `architecture-guide-path`, either a finding with file:line or `none`. Reuse and duplication require a search outside the diff before `none`. With no file, the generic guide is separation of concerns, reuse, duplication, and readable functions. It does not block: those notes are not blockers, high, or medium, they do not change the Verdict, and they do not count toward `REQUEST_CHANGES` or withhold an `APPROVE`. Off by default, so existing reviews stay as they are until a workflow turns it on.
+
+To see the section on one PR before you turn it on, run a local preview. It uses the same model as the action (`claude-sonnet-4-6`, unless the workflow sets `model`), builds the same prompt, and prints the review. It does not post.
+
+```bash
+scripts/preview-review.sh toriihq/torii-monorepo 4821 --checkout /path/to/torii-monorepo
+```
+
 
 ### Triggers
 
@@ -272,6 +289,7 @@ is the supported path).
 - **Cost tracking** — Appends cost, turns, and model to the review body
 - **Review dismissal** — Dismisses previous Claude reviews before posting new ones
 - **Typed failure messages** — Distinguishes max-turns, API errors, and missing output
+- **Advisory architecture section** — Opt-in recommendations that never change the review event
 - **Pure bash** — No TypeScript, no node_modules, no build step
 
 ## How It Works

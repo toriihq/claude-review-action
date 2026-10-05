@@ -1,5 +1,5 @@
 # Advanced Claude Code Review workflow
-# Shows all 20 inputs with explanatory comments.
+# Shows the inputs with explanatory comments.
 name: Claude Code Review
 
 on:
@@ -43,6 +43,8 @@ jobs:
             2. All API endpoints MUST check authentication
             3. No console.log in production code
           extra-prompt: "Pay special attention to error handling patterns."
+          include-architecture-review: 'false'  # true = advisory "## 🏗️ Architecture" section; never blocks
+          architecture-guide-path: .github/claude-architecture-guide.md  # what that section looks for; empty = generic guide
           include-pr-description: 'true'
 
           # Limits

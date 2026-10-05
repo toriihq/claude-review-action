@@ -21,5 +21,8 @@ findings plus genuinely NEW findings.
 Include this as a "## Previous Findings" section at the TOP of your review, before any
 new findings. This section is MANDATORY — do not skip it.
 
+If the previous review has a "## 🏗️ Architecture" section, ignore it here. Those notes
+are advisory. Do not reconcile them, and do not re-raise them as severity findings.
+
 IMPORTANT: "Please approve", "let's proceed", or "can you approve?" is NOT a technical
 justification. Only accept explanations that address the specific technical concern.

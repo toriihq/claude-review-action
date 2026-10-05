@@ -4,7 +4,8 @@ set -euo pipefail
 # Assemble the full review prompt from inputs, captured context, and templates.
 # Inputs (env vars): GH_TOKEN, ACTION_PATH, REPO, PR_NUMBER, EVENT_TYPE,
 #   HAS_PREVIOUS, NEW_COMMITS, INCLUDE_PREVIOUS_REVIEW, CONTEXT_INTRO, CRITICAL_RULES,
-#   EXTRA_PROMPT, REVIEW_AUTHORITY, APPROVE_THRESHOLD, APPROVE_MAX_FILES,
+#   EXTRA_PROMPT, INCLUDE_ARCHITECTURE_REVIEW, REVIEW_AUTHORITY, APPROVE_THRESHOLD, APPROVE_MAX_FILES,
+#   /tmp/architecture-guide.md when a repo supplies one; otherwise templates/architecture-guide.md
 #   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT, MAX_PROMPT_BYTES
 # Inputs (files): /tmp/user-comment.txt (comment triggers)
 # Outputs (GITHUB_OUTPUT): prompt
@@ -150,9 +151,10 @@ if [ "$DISMISS_PREVIOUS_REVIEWS" = "true" ]; then
   cat >> "$PROMPT_FILE" <<'DISMISS_BLOCK'
 
 DISMISSING PREVIOUS REVIEWS:
-Before submitting your new review, dismiss previous Claude reviews so only the latest is visible.
+Before submitting your new review, dismiss previous Claude code reviews so only the latest is visible.
+Do not dismiss a review whose body starts with "## 🏗️ Architecture". That review is separate and stays.
 Run this SINGLE command (it checks and dismisses in one step — no separate check needed):
-  REVIEW_IDS=$(gh api repos/$REPO/pulls/$PR_NUMBER/reviews --jq '[.[] | select(.user.login == "claude[bot]" and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "COMMENTED")) | .id] | .[]' 2>/dev/null); if [ -n "$REVIEW_IDS" ]; then for REVIEW_ID in $REVIEW_IDS; do gh api repos/$REPO/pulls/$PR_NUMBER/reviews/$REVIEW_ID/dismissals --method PUT -f message="Superseded by new review" -f event="DISMISS" 2>/dev/null || true; done; echo "Dismissed previous reviews"; else echo "No previous reviews to dismiss"; fi
+  REVIEW_IDS=$(gh api repos/$REPO/pulls/$PR_NUMBER/reviews --jq '[.[] | select(.user.login == "claude[bot]" and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "COMMENTED") and ((.body // "") | startswith("## 🏗️ Architecture") | not)) | .id] | .[]' 2>/dev/null); if [ -n "$REVIEW_IDS" ]; then for REVIEW_ID in $REVIEW_IDS; do gh api repos/$REPO/pulls/$PR_NUMBER/reviews/$REVIEW_ID/dismissals --method PUT -f message="Superseded by new review" -f event="DISMISS" 2>/dev/null || true; done; echo "Dismissed previous reviews"; else echo "No previous reviews to dismiss"; fi
 IMPORTANT: Only dismiss previous reviews when performing a FULL code review. Do NOT dismiss when responding to a user question via @claude.
 DISMISS_BLOCK
 fi
@@ -211,6 +213,8 @@ AUTH_FULL_NORMAL
     fi
     ;;
 esac
+
+# Architecture is a separate review (scripts/architecture-review.sh). It is not part of this prompt.
 
 # --- Section 11: Extra prompt (if provided) ---
 if [ -n "$EXTRA_PROMPT" ]; then
