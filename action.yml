@@ -278,6 +278,20 @@ runs:
         MAX_TURNS: ${{ steps.adjust-turns.outputs.adjusted_max_turns || inputs.max-turns }}
         TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
 
+    - name: Verify truncated-file coverage
+      if: always() && steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'success'
+      shell: bash
+      run: bash ${{ github.action_path }}/scripts/report-coverage.sh
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
+        CLAUDE_OUTCOME: ${{ steps.claude-review.outcome }}
+        CLAUDE_OUTPUT_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
+        HAS_PREVIOUS: ${{ steps.detect-previous.outputs.has_previous }}
+        DIFF_INLINE: ${{ steps.build-prompt.outputs.diff_inline }}
+
     - name: Report cost
       if: always() && steps.capture-context.outputs.skipped != 'true' && inputs.track-cost == 'true'
       shell: bash

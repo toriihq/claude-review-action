@@ -7,7 +7,7 @@ set -euo pipefail
 #   EXTRA_PROMPT, REVIEW_AUTHORITY, APPROVE_THRESHOLD, APPROVE_MAX_FILES,
 #   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT, MAX_PROMPT_BYTES
 # Inputs (files): /tmp/user-comment.txt (comment triggers)
-# Outputs (GITHUB_OUTPUT): prompt
+# Outputs (GITHUB_OUTPUT): prompt, diff_inline
 
 PROMPT_FILE="/tmp/claude-prompt.md"
 # The prompt reaches claude-code-action as one env var (and JSON-escaped in ALL_INPUTS); big ones fail with E2BIG
@@ -225,7 +225,9 @@ splice() { head -n $((DIFF_LINE - 1)) "$PROMPT_FILE"; cat; tail -n +$((DIFF_LINE
 escaped_bytes() { jq -Rs . "$1" | wc -c | tr -d ' '; }
 
 { echo '```diff'; cat /tmp/pr-diff.txt; [ -z "$(tail -c 1 /tmp/pr-diff.txt)" ] || echo; echo '```'; } | splice > "$PROMPT_FILE.next"
+DIFF_INLINE=true
 if [ "$(escaped_bytes "$PROMPT_FILE.next")" -gt "$MAX_PROMPT_BYTES" ]; then
+  DIFF_INLINE=false
   DIFF_BYTES=$(wc -c < /tmp/pr-diff.txt | tr -d ' ')
   echo "::notice::Diff (${DIFF_BYTES} bytes) moved out of the prompt to /tmp/pr-diff.txt — prompt would exceed ${MAX_PROMPT_BYTES} bytes"
   printf '%s\n' "The diff ($(wc -l < /tmp/pr-diff.txt | tr -d ' ') lines, ${DIFF_BYTES} bytes) is too large to include here. It is saved at \`/tmp/pr-diff.txt\`. You MUST Read ALL of it (page with offset/limit) before submitting your review." \
@@ -242,6 +244,7 @@ if [ "$PROMPT_BYTES" -gt "$MAX_PROMPT_BYTES" ]; then
 fi
 
 # --- Export prompt as GitHub Actions output ---
+echo "diff_inline=${DIFF_INLINE}" >> "$GITHUB_OUTPUT"
 {
   # Random delimiter — PR-controlled text could otherwise end the heredoc and set other outputs
   DELIM="EOF_PROMPT_$(openssl rand -hex 16)"

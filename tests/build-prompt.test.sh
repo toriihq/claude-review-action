@@ -13,12 +13,13 @@ run() { : > "$T/out"; : > "$T/gh.log"; GITHUB_OUTPUT="$T/out" MAX_PROMPT_BYTES="
 printf 'diff --git a/x b/x\n+```\n+secret-line\n' > /tmp/pr-diff.txt; echo "desc" > /tmp/pr-description.txt
 run 120000 || fail "small: exit"
 grep -q '^+secret-line$' /tmp/claude-prompt.md && grep -q '^```diff$' /tmp/claude-prompt.md || fail "small: diff not inlined"
-grep -q '@@CLAUDE_REVIEW_PR_DIFF@@' /tmp/claude-prompt.md && fail "small: marker left"
+grep -q "^diff_inline=true$" "$T/out" || fail "small: diff_inline output"
 
 for i in $(seq 100); do echo "+padding line $i of the big diff"; done >> /tmp/pr-diff.txt
 run 4000 || fail "big diff: exit"
 grep -q 'secret-line' /tmp/claude-prompt.md && fail "big diff: diff still inlined"
 grep -q '/tmp/pr-diff.txt' /tmp/claude-prompt.md || fail "big diff: no pointer"
+grep -q "^diff_inline=false$" "$T/out" || fail "big diff: diff_inline output"
 grep -q 'secret-line' "$T/out" && fail "big diff: diff in output"
 [ "$(wc -c < /tmp/claude-prompt.md)" -le 4000 ] || fail "big diff: prompt over cap"
 

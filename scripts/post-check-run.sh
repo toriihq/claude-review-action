@@ -39,6 +39,10 @@ else
       TITLE="Changes requested"
       if [ "${BLOCKING:-false}" = "true" ]; then CONCLUSION="failure"; else CONCLUSION="neutral"; fi
       ;;
+    DISMISSED)  # report-coverage.sh withdrew an approval given without reading the truncated files
+      TITLE="Approval withdrawn — truncated files not reviewed"
+      CONCLUSION="neutral"
+      ;;
     APPROVED)
       TITLE="Approved"
       CONCLUSION="success"

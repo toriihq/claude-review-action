@@ -267,7 +267,7 @@ is the supported path).
 - **3 trigger types** — Label, `@claude` in PR comments, `@claude` in inline review comments
 - **Re-review reconciliation** — Tracks previous findings, author responses, and new commits. Each HIGH/BLOCKER is marked FIXED, ACCEPTED, or STILL OPEN
 - **Relevant commit filtering** — Only flags commits that contribute real changes vs base
-- **Truncation awareness** — When diff exceeds limits, detects missing files, instructs Claude to spot-check, and requires disclosure in the verdict
+- **Truncation awareness** — When diff exceeds limits, saves each missing file's diff for Claude to read, then verifies from Claude's execution log which ones it actually read and writes that into the review. A first review that approves without reading them all has its approval withdrawn
 - **PR size guard** — Skips reviews for PRs exceeding configurable file limits
 - **Cost tracking** — Appends cost, turns, and model to the review body
 - **Review dismissal** — Dismisses previous Claude reviews before posting new ones
@@ -295,6 +295,7 @@ claude-code-action   → Run Claude with assembled prompt
   ↓
 post-failure.sh      → Post typed failure message (if failed)
   ↓
+report-coverage.sh   → Verify which truncated files Claude read; fix the review's note, withdraw unearned approvals
 report-cost.sh       → Append cost/turns/model to review body
 ```
 

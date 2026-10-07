@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.2] - 2026-10-07
+
+### Fixed
+- With a truncated diff, Claude could skip reading the missing files and still write "Reviewed the diffs of N missing files" — and approve. A new step reads Claude's execution log, checks which saved diffs it actually opened (successful `Read`s and Bash reads; not its own `gh` review post), replaces the model's note with a verified one ("read 3/8 — not reviewed: …"), and withdraws a first review's approval when files went unread. Re-reviews get the note only.
+- Check runs for a withdrawn approval say "Approval withdrawn — truncated files not reviewed".
+
 ## [1.2.1] - 2026-10-01
 
 ### Fixed
