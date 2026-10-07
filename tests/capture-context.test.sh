@@ -53,11 +53,14 @@ mkdir -p "$T/bin"
 cat > "$T/bin/gh" <<GH
 #!/usr/bin/env bash
 case "\$1 \$2" in
-  "pr view") echo 7 ;;
+  "api --paginate") cat "$T/pages" ;;
   "pr diff") cat "$T/diff" ;;
+  "pr comment") echo "\$*" >> "$T/gh.log" ;;
 esac
 GH
 chmod +x "$T/bin/gh"
+# One file count per page of the REST files endpoint
+echo 7 > "$T/pages"
 
 # Cut inside b.ts: a.ts complete, b.ts partial, the rest absent
 PATH="$T/bin:$PATH" GITHUB_OUTPUT="$T/out" PR_NUMBER=1 REPO=x MAX_FILES=50 \
@@ -73,4 +76,12 @@ grep -q '^deleted file mode' /tmp/pr-diffs/gone.ts.diff || { echo "FAIL deleted 
 [ ! -e PWNED ] && [ ! -e /tmp/pr-diffs/PWNED ] || { echo "FAIL path executed"; exit 1; }
 grep -q '^+S$' "/tmp/pr-diffs/a b/foo.ts.diff" || { echo "FAIL space-b path"; exit 1; }
 [ -f '/tmp/pr-diffs/caf\303\251.ts.diff' ] || { echo "FAIL quoted path"; exit 1; }
+grep -q '^file_count=7$' "$T/out" || { echo "FAIL file count"; cat "$T/out"; exit 1; }
+
+# Over 100 files are counted (gh pr view --json files stops at 100)
+printf '100\n50\n' > "$T/pages"; : > "$T/out"
+PATH="$T/bin:$PATH" GITHUB_OUTPUT="$T/out" PR_NUMBER=1 REPO=x MAX_FILES=120 \
+  MAX_DIFF_LINES=10 MAX_DIFF_BYTES=999999 INCLUDE_PR_DESCRIPTION=false \
+  bash scripts/capture-context.sh > /dev/null
+grep -q '^skipped=true$' "$T/out" && grep -q '150 files' "$T/gh.log" || { echo "FAIL file count over 100"; cat "$T/out"; exit 1; }
 echo PASS

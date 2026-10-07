@@ -7,7 +7,8 @@ set -euo pipefail
 # Outputs (files): /tmp/pr-diff.txt, /tmp/pr-description.txt, /tmp/truncated-files.txt, /tmp/pr-diffs/<path>.diff
 
 # --- PR size guard ---
-FILE_COUNT=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json files --jq '.files | length')
+# REST, paginated: `gh pr view --json files` stops at 100 files
+FILE_COUNT=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq 'length' | awk '{ n += $1 } END { print n + 0 }')
 echo "file_count=$FILE_COUNT" >> "$GITHUB_OUTPUT"
 
 if [ "$FILE_COUNT" -gt "$MAX_FILES" ]; then
