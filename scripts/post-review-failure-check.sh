@@ -9,7 +9,7 @@ REASON="${1:-action-error}"
 case "$REASON" in
   too-large)
     TITLE="PR too large to review"
-    SUMMARY="This PR exceeds the file limit for automated review." ;;
+    SUMMARY="This PR exceeds the size limit for automated review." ;;
   *)
     TITLE="Review could not complete"
     SUMMARY="The code review encountered an error. See the workflow run for details." ;;

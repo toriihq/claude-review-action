@@ -180,11 +180,23 @@ Only `anthropic-api-key` is required. Everything else has sensible defaults.
 | Input | Default | Description |
 |-------|---------|-------------|
 | `max-files` | `50` | Skip review if PR exceeds this many files |
+| `max-changed-lines` | `""` | Skip review if PR changes more than N lines (additions + deletions). Empty = no limit |
+| `exclude-paths` | `""` | Files to leave out of the diff and size limits, one pattern per line |
 | `max-diff-lines` | `3000` | Truncate diff after N lines |
 | `max-diff-bytes` | `80000` | Truncate diff after N bytes |
 | `max-prompt-bytes` | `120000` | Above this, the diff is saved to `/tmp/pr-diff.txt` for Claude to Read instead of inlined (Linux caps one env var at 128 KB) |
 | `max-turns` | `30` | Claude conversation turn limit |
 | `timeout-minutes` | `20` | Informational — set actual timeout on your job |
+
+To limit by lines instead of files, raise `max-files` and set `max-changed-lines`. GitHub can't return a diff for a PR with more than 300 files, excluded files included. `exclude-paths` takes bash patterns where `*` also matches `/`. Excluded files are removed from the diff and not counted by any limit.
+
+```yaml
+exclude-paths: |
+  *package-lock.json
+  *.gen.ts
+max-files: '300'
+max-changed-lines: '5000'
+```
 
 ### Model & Tools
 
@@ -200,6 +212,7 @@ Only `anthropic-api-key` is required. Everything else has sensible defaults.
 | `review-authority` | `request-changes` | `comment-only`, `request-changes`, or `full` |
 | `approve-threshold` | `strict` | For `full`: `strict` (zero MEDIUM+) or `normal` (zero HIGH+) |
 | `approve-max-files` | `50` | For `full`: only approve PRs with <= N files |
+| `approve-max-changed-lines` | `""` | For `full`: only approve PRs with <= N changed lines. Empty = no limit |
 
 **Authority levels:**
 
@@ -268,7 +281,7 @@ is the supported path).
 - **Re-review reconciliation** — Tracks previous findings, author responses, and new commits. Each HIGH/BLOCKER is marked FIXED, ACCEPTED, or STILL OPEN
 - **Relevant commit filtering** — Only flags commits that contribute real changes vs base
 - **Truncation awareness** — When diff exceeds limits, saves each missing file's diff for Claude to read, then verifies from Claude's execution log which ones it actually read and writes that into the review. A first review that approves without reading them all has its approval withdrawn
-- **PR size guard** — Skips reviews for PRs exceeding configurable file limits
+- **PR size guard** — Skips reviews for PRs exceeding configurable file or line limits
 - **Cost tracking** — Appends cost, turns, and model to the review body
 - **Review dismissal** — Dismisses previous Claude reviews before posting new ones
 - **Typed failure messages** — Distinguishes max-turns, API errors, and missing output

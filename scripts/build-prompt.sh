@@ -5,8 +5,8 @@ set -euo pipefail
 # Inputs (env vars): GH_TOKEN, ACTION_PATH, REPO, PR_NUMBER, EVENT_TYPE,
 #   HAS_PREVIOUS, NEW_COMMITS, INCLUDE_PREVIOUS_REVIEW, CONTEXT_INTRO, CRITICAL_RULES,
 #   EXTRA_PROMPT, REVIEW_AUTHORITY, APPROVE_THRESHOLD, APPROVE_MAX_FILES,
-#   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT, MAX_PROMPT_BYTES
-# Inputs (files): /tmp/user-comment.txt (comment triggers)
+#   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT, CHANGED_LINES, APPROVE_MAX_CHANGED_LINES, MAX_PROMPT_BYTES
+# Inputs (files): /tmp/user-comment.txt (comment triggers), /tmp/excluded-files.txt
 # Outputs (GITHUB_OUTPUT): prompt, diff_inline
 
 PROMPT_FILE="/tmp/claude-prompt.md"
@@ -99,6 +99,20 @@ TRUNC_HEADER
   while IFS= read -r file; do
     echo "- \`$file\` → \`/tmp/pr-diffs/$file.diff\`" >> "$PROMPT_FILE"
   done < /tmp/truncated-files.txt
+fi
+
+# --- Section 7c: Excluded files list (exclude-paths) ---
+if [ -s /tmp/excluded-files.txt ]; then
+  EXCLUDED_COUNT=$(wc -l < /tmp/excluded-files.txt | tr -d ' ')
+  cat >> "$PROMPT_FILE" <<EXCLUDED_HEADER
+
+## EXCLUDED FROM REVIEW — ${EXCLUDED_COUNT} files
+
+These files changed but match \`exclude-paths\`, so they are not in the diff. Do not review them or report findings on them.
+
+EXCLUDED_HEADER
+  head -n 50 /tmp/excluded-files.txt | sed 's/.*/- `&`/' >> "$PROMPT_FILE"
+  [ "$EXCLUDED_COUNT" -le 50 ] || echo "- … and $((EXCLUDED_COUNT - 50)) more" >> "$PROMPT_FILE"
 fi
 
 # --- Section 8: Focus info (re-review with new commits — always shown, even without reconciliation) ---
@@ -209,6 +223,13 @@ SUBMITTING THE REVIEW — choose the event based on your findings:
 ⚠️ NORMAL THRESHOLD: You MUST NOT approve if there are ANY 🟠 HIGH or 🔴 BLOCKER findings.
 AUTH_FULL_NORMAL
     fi
+    NO_APPROVE=""
+    if [ -n "$APPROVE_MAX_CHANGED_LINES" ] && [ "${CHANGED_LINES:-0}" -gt "$APPROVE_MAX_CHANGED_LINES" ]; then
+      NO_APPROVE="This PR changes ${CHANGED_LINES} lines (approval limit: ${APPROVE_MAX_CHANGED_LINES})."
+    elif [ "${FILE_COUNT:-}" = "0" ] && [ -s /tmp/excluded-files.txt ]; then
+      NO_APPROVE="Every changed file is excluded from review."
+    fi
+    [ -z "$NO_APPROVE" ] || printf '\n⚠️ %s You MUST NOT APPROVE this PR — use COMMENT where you would have approved.\n' "$NO_APPROVE" >> "$PROMPT_FILE"
     ;;
 esac
 

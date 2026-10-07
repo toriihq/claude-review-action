@@ -39,6 +39,14 @@ inputs:
     description: 'Skip review if PR exceeds this many files'
     required: false
     default: '50'
+  max-changed-lines:
+    description: 'Skip review if PR changes more than N lines (additions + deletions). Empty = no limit'
+    required: false
+    default: ''
+  exclude-paths:
+    description: 'Files to leave out of the diff and size limits, one bash pattern per line (`*` also matches `/`)'
+    required: false
+    default: ''
   max-diff-lines:
     description: 'Truncate diff after N lines'
     required: false
@@ -83,6 +91,10 @@ inputs:
     description: 'For full mode: only approve PRs with <= N files'
     required: false
     default: '50'
+  approve-max-changed-lines:
+    description: 'For full mode: only approve PRs with <= N changed lines. Empty = no limit'
+    required: false
+    default: ''
 
   # Triggers
   review-label:
@@ -178,6 +190,8 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ steps.resolve-pr.outputs.pr_number }}
         MAX_FILES: ${{ inputs.max-files }}
+        MAX_CHANGED_LINES: ${{ inputs.max-changed-lines }}
+        EXCLUDE_PATHS: ${{ inputs.exclude-paths }}
         MAX_DIFF_LINES: ${{ inputs.max-diff-lines }}
         MAX_DIFF_BYTES: ${{ inputs.max-diff-bytes }}
         INCLUDE_PR_DESCRIPTION: ${{ inputs.include-pr-description }}
@@ -243,6 +257,8 @@ runs:
         APPROVE_MAX_FILES: ${{ inputs.approve-max-files }}
         DISMISS_PREVIOUS_REVIEWS: ${{ inputs.dismiss-previous-reviews }}
         FILE_COUNT: ${{ steps.capture-context.outputs.file_count }}
+        CHANGED_LINES: ${{ steps.capture-context.outputs.changed_lines }}
+        APPROVE_MAX_CHANGED_LINES: ${{ inputs.approve-max-changed-lines }}
         MAX_PROMPT_BYTES: ${{ inputs.max-prompt-bytes }}
 
     - name: Run Claude Code Review

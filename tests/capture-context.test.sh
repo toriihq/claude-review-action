@@ -49,20 +49,28 @@ deleted file mode 100644
 -x
 DIFF
 
+# What the REST files endpoint returns after gh's --jq: "<additions + deletions>\t<path>"
+printf '%s\t%s\n' 2 src/a.ts 4 src/deep/b.ts 0 renamed.ts 1 '$(touch PWNED)/x.ts' 2 'a b/foo.ts' 2 'café.ts' 1 gone.ts > "$T/files.tsv"
+
 mkdir -p "$T/bin"
 cat > "$T/bin/gh" <<GH
 #!/usr/bin/env bash
 case "\$1 \$2" in
-  "pr view") echo 7 ;;
+  "api --paginate") cat "$T/files.tsv" ;;
   "pr diff") cat "$T/diff" ;;
+  "pr comment") echo "\$*" >> "$T/gh.log" ;;
 esac
 GH
 chmod +x "$T/bin/gh"
+capture() {
+  : > "$T/out"; : > "$T/gh.log"
+  env PATH="$T/bin:$PATH" GITHUB_OUTPUT="$T/out" PR_NUMBER=1 REPO=x INCLUDE_PR_DESCRIPTION=false MAX_FILES=50 \
+    MAX_CHANGED_LINES= EXCLUDE_PATHS= MAX_DIFF_LINES=999999 MAX_DIFF_BYTES=999999 "$@" bash scripts/capture-context.sh > /dev/null
+}
 
 # Cut inside b.ts: a.ts complete, b.ts partial, the rest absent
-PATH="$T/bin:$PATH" GITHUB_OUTPUT="$T/out" PR_NUMBER=1 REPO=x MAX_FILES=50 \
-  MAX_DIFF_LINES=10 MAX_DIFF_BYTES=999999 INCLUDE_PR_DESCRIPTION=false \
-  bash scripts/capture-context.sh > /dev/null
+capture MAX_DIFF_LINES=10
+grep -q '^file_count=7$' "$T/out" && grep -q '^changed_lines=12$' "$T/out" || { echo "FAIL counts"; cat "$T/out"; exit 1; }
 
 expected=$'$(touch PWNED)/x.ts\na b/foo.ts\ncaf\\303\\251.ts\ngone.ts\nrenamed.ts\nsrc/deep/b.ts'
 [ "$(cat /tmp/truncated-files.txt)" = "$expected" ] || { echo "FAIL missing list:"; cat /tmp/truncated-files.txt; exit 1; }
@@ -73,4 +81,34 @@ grep -q '^deleted file mode' /tmp/pr-diffs/gone.ts.diff || { echo "FAIL deleted 
 [ ! -e PWNED ] && [ ! -e /tmp/pr-diffs/PWNED ] || { echo "FAIL path executed"; exit 1; }
 grep -q '^+S$' "/tmp/pr-diffs/a b/foo.ts.diff" || { echo "FAIL space-b path"; exit 1; }
 [ -f '/tmp/pr-diffs/caf\303\251.ts.diff' ] || { echo "FAIL quoted path"; exit 1; }
+
+# exclude-paths: out of the diff and both counts; patterns trimmed, blank lines ignored, `*` crosses `/`
+capture EXCLUDE_PATHS=$'  src/*/b.ts  \n\ngone.ts'
+[ "$(cat /tmp/excluded-files.txt)" = $'src/deep/b.ts\ngone.ts' ] || { echo "FAIL excluded list"; cat /tmp/excluded-files.txt; exit 1; }
+grep -q '^file_count=5$' "$T/out" && grep -q '^changed_lines=7$' "$T/out" || { echo "FAIL excluded counts"; cat "$T/out"; exit 1; }
+grep -qE '^diff --git a/(src/deep/b|gone)\.ts' /tmp/pr-diff.txt && { echo "FAIL excluded file still in diff"; exit 1; }
+grep -q '^+A$' /tmp/pr-diff.txt && grep -q '^+S$' /tmp/pr-diff.txt && grep -q '^rename to renamed.ts$' /tmp/pr-diff.txt \
+  || { echo "FAIL kept file dropped from diff"; exit 1; }
+
+# Non-ASCII path: the diff header is octal-escaped, the REST path isn't
+capture EXCLUDE_PATHS='café.ts'
+grep -q '^file_count=6$' "$T/out" || { echo "FAIL non-ASCII count"; cat "$T/out"; exit 1; }
+grep -q 'caf\\303\\251' /tmp/pr-diff.txt && { echo "FAIL non-ASCII file still in diff"; exit 1; }
+
+# Excluded files never show up as truncated
+capture MAX_DIFF_LINES=10 EXCLUDE_PATHS=$'gone.ts\n*foo.ts'
+[ "$(cat /tmp/truncated-files.txt)" = $'$(touch PWNED)/x.ts\ncaf\\303\\251.ts\nrenamed.ts\nsrc/deep/b.ts' ] \
+  || { echo "FAIL excluded + truncated:"; cat /tmp/truncated-files.txt; exit 1; }
+grep -q '^missing_file_count=4$' "$T/out" || { echo "FAIL excluded + truncated count"; cat "$T/out"; exit 1; }
+
+# max-changed-lines: skips over the limit; excluded files don't count toward it
+capture MAX_CHANGED_LINES=11
+grep -q '^skipped=true$' "$T/out" && grep -q '12 changed lines' "$T/gh.log" || { echo "FAIL line limit not enforced"; exit 1; }
+capture MAX_CHANGED_LINES=11 EXCLUDE_PATHS=gone.ts
+grep -q '^skipped=true$' "$T/out" && { echo "FAIL excluded lines counted"; exit 1; }
+
+# Over 100 files are counted (gh pr view --json files stops at 100)
+for i in $(seq 150); do printf '1\tf%s.ts\n' "$i"; done > "$T/files.tsv"
+capture MAX_FILES=120
+grep -q '^skipped=true$' "$T/out" && grep -q '150 files' "$T/gh.log" || { echo "FAIL file count over 100"; cat "$T/out"; exit 1; }
 echo PASS
