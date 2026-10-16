@@ -327,19 +327,14 @@ runs:
     - name: Post review failure check
       if: always() && inputs.post-check-run == 'true' && (steps.capture-context.outputs.skipped == 'true' || steps.build-prompt.outcome == 'failure' || steps.claude-review.outcome == 'failure' || steps.claude-review.outcome == 'cancelled' || steps.post-failure.outputs.did_not_run == 'true')
       shell: bash
-      run: |
-        if [ "$SKIPPED" = "true" ]; then
-          bash ${{ github.action_path }}/scripts/post-review-failure-check.sh too-large
-        else
-          bash ${{ github.action_path }}/scripts/post-review-failure-check.sh action-error
-        fi
+      run: bash ${{ github.action_path }}/scripts/post-review-failure-check.sh "$SKIP_REASON"
       env:
         GH_TOKEN: ${{ github.token }}
         REPO: ${{ github.repository }}
         HEAD_SHA: ${{ steps.resolve-pr.outputs.pr_sha }}
         CHECK_NAME: ${{ inputs.check-run-name }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        SKIPPED: ${{ steps.capture-context.outputs.skipped }}
+        SKIP_REASON: ${{ steps.capture-context.outputs.skip_reason }}
 
     - name: Post check run
       if: always() && inputs.post-check-run == 'true' && steps.capture-context.outputs.skipped != 'true' && steps.claude-review.outcome == 'success' && steps.post-failure.outputs.did_not_run != 'true'

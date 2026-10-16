@@ -40,8 +40,6 @@ grep -qF 'what does $(whoami) do?' /tmp/claude-prompt.md || fail "comment: not i
 : > /tmp/user-comment.txt; printf 'package-lock.json\n$(whoami)/gen.ts\n' > /tmp/excluded-files.txt
 run 120000 || fail "excluded: exit"
 grep -q 'EXCLUDED FROM REVIEW — 2 files' /tmp/claude-prompt.md && grep -qF -- '- `$(whoami)/gen.ts`' /tmp/claude-prompt.md || fail "excluded: list missing"
-REVIEW_AUTHORITY=full FILE_COUNT=0 run 120000 || fail "no files: exit"
-grep -q 'No changed files are left to review' /tmp/claude-prompt.md || fail "no files: approval allowed"
 REVIEW_AUTHORITY=full FILE_COUNT=3 run 120000 || fail "some excluded: exit"
 grep -q 'MUST NOT APPROVE' /tmp/claude-prompt.md && fail "some excluded: approval blocked"
 : > /tmp/excluded-files.txt

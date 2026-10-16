@@ -225,9 +225,7 @@ SUBMITTING THE REVIEW — choose the event based on your findings:
 AUTH_FULL_NORMAL
     fi
     NO_APPROVE=""
-    if [ "${FILE_COUNT:-}" = "0" ]; then
-      NO_APPROVE="No changed files are left to review."
-    elif [ -n "$APPROVE_MAX_FILES" ] && [ "${FILE_COUNT:-0}" -gt "$APPROVE_MAX_FILES" ]; then
+    if [ -n "$APPROVE_MAX_FILES" ] && [ "${FILE_COUNT:-0}" -gt "$APPROVE_MAX_FILES" ]; then
       NO_APPROVE="This PR has ${FILE_COUNT} files (approval limit: ${APPROVE_MAX_FILES})."
     elif [ -n "$APPROVE_MAX_CHANGED_LINES" ] && [ "${CHANGED_LINES:-0}" -gt "$APPROVE_MAX_CHANGED_LINES" ]; then
       NO_APPROVE="This PR changes ${CHANGED_LINES} lines (approval limit: ${APPROVE_MAX_CHANGED_LINES})."

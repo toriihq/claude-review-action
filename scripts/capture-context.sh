@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Capture PR context: size check, diff (truncated), description.
 # Inputs (env vars): GH_TOKEN, REPO, PR_NUMBER, MAX_FILES, MAX_CHANGED_LINES, EXCLUDE_PATHS, MAX_DIFF_LINES, MAX_DIFF_BYTES, INCLUDE_PR_DESCRIPTION
-# Outputs (GITHUB_OUTPUT): file_count, changed_lines, diff_truncated, missing_file_count
+# Outputs (GITHUB_OUTPUT): file_count, changed_lines, skipped, skip_reason, diff_truncated, missing_file_count
 # Outputs (files): /tmp/pr-diff.txt, /tmp/pr-description.txt, /tmp/truncated-files.txt, /tmp/excluded-files.txt, /tmp/pr-diffs/<path>.diff
 
 # Diff header -> new path (single parser). Symmetric a/X b/X first so " b/" inside X is safe; greedy for renames.
@@ -19,7 +19,9 @@ header_paths() {
 # Git C-quotes unusual paths (caf\303\251.ts, we\"ird.ts); decode to match the REST paths
 decode_path() {
   local p=${1//\\\"/\"}
-  printf '%b' "$(sed 's/\\\([0-7][0-7][0-7]\)/\\0\1/g' <<< "$p")"
+  p=${p//\\\\/$'\001'}
+  p=$(sed 's/\\\([0-7][0-7][0-7]\)/\\0\1/g' <<< "$p")
+  printf '%b' "${p//$'\001'/\\\\}"
 }
 
 # exclude-paths: one bash pattern per line, `*` also matches `/`
@@ -53,19 +55,29 @@ if [ ${#EXCLUDE_PATTERNS[@]} -gt 0 ]; then
 fi
 EXCLUDED_COUNT=$(wc -l < /tmp/excluded-files.txt | tr -d ' ')
 EXCLUDED_NOTE=""
-[ "$EXCLUDED_COUNT" -gt 0 ] && EXCLUDED_NOTE=", not counting $EXCLUDED_COUNT excluded files"
+[ "$EXCLUDED_COUNT" = 1 ] && EXCLUDED_NOTE=", not counting 1 excluded file"
+[ "$EXCLUDED_COUNT" -gt 1 ] && EXCLUDED_NOTE=", not counting $EXCLUDED_COUNT excluded files"
 echo "file_count=$FILE_COUNT" >> "$GITHUB_OUTPUT"
 echo "changed_lines=$CHANGED_LINES" >> "$GITHUB_OUTPUT"
 
+# Arg $1: reason for post-review-failure-check.sh
+skip() {
+  echo "skip_reason=$1" >> "$GITHUB_OUTPUT"
+  echo "skipped=true" >> "$GITHUB_OUTPUT"
+  exit 0
+}
 skip_too_large() {
   gh pr comment "$PR_NUMBER" --repo "$REPO" \
     --body "⚠️ PR too large for automated review ($1${EXCLUDED_NOTE}, limit: $2). Please split into smaller PRs or review manually." || true
   echo "::notice::Review skipped — PR has $1 (limit: $2)"
-  echo "skipped=true" >> "$GITHUB_OUTPUT"
-  exit 0
+  skip too-large
 }
-if [ "$FILE_COUNT" -gt "$MAX_FILES" ]; then skip_too_large "$FILE_COUNT files" "$MAX_FILES"; fi
-if [ -n "${MAX_CHANGED_LINES:-}" ] && [ "$CHANGED_LINES" -gt "$MAX_CHANGED_LINES" ]; then
+if [ "$FILE_COUNT" -le 0 ]; then
+  echo "::notice::Review skipped — no changed files to review${EXCLUDED_NOTE}"
+  skip no-files
+fi
+if [ -n "$MAX_FILES" ] && [ "$FILE_COUNT" -gt "$MAX_FILES" ]; then skip_too_large "$FILE_COUNT files" "$MAX_FILES"; fi
+if [ -n "$MAX_CHANGED_LINES" ] && [ "$CHANGED_LINES" -gt "$MAX_CHANGED_LINES" ]; then
   skip_too_large "$CHANGED_LINES changed lines" "$MAX_CHANGED_LINES"
 fi
 
@@ -76,13 +88,12 @@ if ! gh pr diff "$PR_NUMBER" --repo "$REPO" > /tmp/pr-diff.txt 2>/tmp/diff-error
     gh pr comment "$PR_NUMBER" --repo "$REPO" \
       --body "⚠️ **Claude review skipped** — PR diff exceeds GitHub's 20,000-line API limit. Please split into smaller PRs or review manually." || true
     echo "::error::Review skipped — PR diff too large for GitHub API (HTTP 406)"
-  else
-    gh pr comment "$PR_NUMBER" --repo "$REPO" \
-      --body "⚠️ **Claude review failed** — could not fetch PR diff. Error: \`${DIFF_ERROR}\`" || true
-    echo "::error::Failed to fetch PR diff: $DIFF_ERROR"
+    skip too-large
   fi
-  echo "skipped=true" >> "$GITHUB_OUTPUT"
-  exit 0
+  gh pr comment "$PR_NUMBER" --repo "$REPO" \
+    --body "⚠️ **Claude review failed** — could not fetch PR diff. Error: \`${DIFF_ERROR}\`" || true
+  echo "::error::Failed to fetch PR diff: $DIFF_ERROR"
+  skip action-error
 fi
 
 # Drop excluded files before truncation so they don't use the diff budget
