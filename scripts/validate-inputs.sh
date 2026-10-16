@@ -35,6 +35,21 @@ MSG
     ;;
 esac
 
+# Size limits must be whole numbers, so a typo like '5k' can't switch a limit off
+for INPUT in max-files max-changed-lines approve-max-files approve-max-changed-lines; do
+  VAR=$(echo "$INPUT" | tr 'a-z-' 'A-Z_')
+  VALUE="${!VAR:-}"
+  [[ -z "$VALUE" || "$VALUE" =~ ^[0-9]+$ ]] && continue
+  post_error "$(cat <<MSG
+❌ **Claude Review failed — invalid configuration**
+
+\`${INPUT}: '${VALUE}'\` is not valid. Must be a whole number, or empty for no limit.
+MSG
+)"
+  echo "::error::Invalid ${INPUT}: '${VALUE}'. Must be a whole number, or empty for no limit."
+  exit 1
+done
+
 # Validate the key works with a lightweight API call
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
   https://api.anthropic.com/v1/messages \

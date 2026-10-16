@@ -5,8 +5,8 @@ set -euo pipefail
 # Inputs (env vars): GH_TOKEN, ACTION_PATH, REPO, PR_NUMBER, EVENT_TYPE,
 #   HAS_PREVIOUS, NEW_COMMITS, INCLUDE_PREVIOUS_REVIEW, CONTEXT_INTRO, CRITICAL_RULES,
 #   EXTRA_PROMPT, REVIEW_AUTHORITY, APPROVE_THRESHOLD, APPROVE_MAX_FILES,
-#   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT, MAX_PROMPT_BYTES
-# Inputs (files): /tmp/user-comment.txt (comment triggers)
+#   DISMISS_PREVIOUS_REVIEWS, FILE_COUNT, CHANGED_LINES, APPROVE_MAX_CHANGED_LINES, MAX_PROMPT_BYTES
+# Inputs (files): /tmp/user-comment.txt (comment triggers), /tmp/excluded-files.txt
 # Outputs (GITHUB_OUTPUT): prompt, diff_inline
 
 PROMPT_FILE="/tmp/claude-prompt.md"
@@ -101,6 +101,21 @@ TRUNC_HEADER
   done < /tmp/truncated-files.txt
 fi
 
+# --- Section 7c: Excluded files list (exclude-paths) ---
+if [ -s /tmp/excluded-files.txt ]; then
+  EXCLUDED_COUNT=$(wc -l < /tmp/excluded-files.txt | tr -d ' ')
+  cat >> "$PROMPT_FILE" <<EXCLUDED_HEADER
+
+## EXCLUDED FROM REVIEW — ${EXCLUDED_COUNT} files
+
+These files changed but match \`exclude-paths\`, so they are not in the diff. Do not review them or report findings on them.
+
+EXCLUDED_HEADER
+  LIST_CAP=50
+  head -n "$LIST_CAP" /tmp/excluded-files.txt | sed 's/.*/- `&`/' >> "$PROMPT_FILE"
+  [ "$EXCLUDED_COUNT" -le "$LIST_CAP" ] || echo "- … and $((EXCLUDED_COUNT - LIST_CAP)) more" >> "$PROMPT_FILE"
+fi
+
 # --- Section 8: Focus info (re-review with new commits — always shown, even without reconciliation) ---
 if [ "$HAS_PREVIOUS" = "true" ] && [ -n "$NEW_COMMITS" ]; then
   cat >> "$PROMPT_FILE" <<FOCUS_END
@@ -181,14 +196,14 @@ AUTH_RC
   full)
     # NOTE: Unquoted heredoc means shell expansion is active.
     # \$REPO and \$PR_NUMBER are escaped → become literal $REPO/$PR_NUMBER in Claude's prompt.
-    # ${APPROVE_MAX_FILES} and threshold conditions expand to actual values (intentional).
+    # Threshold conditions expand to actual values (intentional).
     if [ "$APPROVE_THRESHOLD" = "strict" ]; then
       cat >> "$PROMPT_FILE" <<AUTH_FULL_STRICT
 
 SUBMITTING THE REVIEW — choose the event based on your findings:
 1. If ANY 🔴 BLOCKER, 🟠 HIGH, or 🟡 MEDIUM findings exist → REQUEST_CHANGES:
      gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=REQUEST_CHANGES -f body="your review"
-2. If ONLY 🔵 LOW findings (or no findings at all) AND the PR has <= ${APPROVE_MAX_FILES} files → APPROVE:
+2. If ONLY 🔵 LOW findings (or no findings at all) → APPROVE:
      gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=APPROVE -f body="your review"
 3. Otherwise → COMMENT:
      gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=COMMENT -f body="your review"
@@ -201,7 +216,7 @@ AUTH_FULL_STRICT
 SUBMITTING THE REVIEW — choose the event based on your findings:
 1. If ANY 🔴 BLOCKER or 🟠 HIGH findings exist → REQUEST_CHANGES:
      gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=REQUEST_CHANGES -f body="your review"
-2. If NO findings above 🟡 MEDIUM (i.e., only MEDIUM/LOW or no findings) AND the PR has <= ${APPROVE_MAX_FILES} files → APPROVE:
+2. If NO findings above 🟡 MEDIUM (i.e., only MEDIUM/LOW or no findings) → APPROVE:
      gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=APPROVE -f body="your review"
 3. Otherwise → COMMENT:
      gh api repos/\$REPO/pulls/\$PR_NUMBER/reviews --method POST -f event=COMMENT -f body="your review"
@@ -209,6 +224,15 @@ SUBMITTING THE REVIEW — choose the event based on your findings:
 ⚠️ NORMAL THRESHOLD: You MUST NOT approve if there are ANY 🟠 HIGH or 🔴 BLOCKER findings.
 AUTH_FULL_NORMAL
     fi
+    NO_APPROVE=""
+    if [ "${FILE_COUNT:-}" = "0" ]; then
+      NO_APPROVE="No changed files are left to review."
+    elif [ -n "$APPROVE_MAX_FILES" ] && [ "${FILE_COUNT:-0}" -gt "$APPROVE_MAX_FILES" ]; then
+      NO_APPROVE="This PR has ${FILE_COUNT} files (approval limit: ${APPROVE_MAX_FILES})."
+    elif [ -n "$APPROVE_MAX_CHANGED_LINES" ] && [ "${CHANGED_LINES:-0}" -gt "$APPROVE_MAX_CHANGED_LINES" ]; then
+      NO_APPROVE="This PR changes ${CHANGED_LINES} lines (approval limit: ${APPROVE_MAX_CHANGED_LINES})."
+    fi
+    [ -z "$NO_APPROVE" ] || printf '\n⚠️ %s You MUST NOT APPROVE this PR — use COMMENT where you would have approved.\n' "$NO_APPROVE" >> "$PROMPT_FILE"
     ;;
 esac
 
