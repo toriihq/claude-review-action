@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Post a neutral check run when the review could not complete.
+# Post a neutral check run when the review was skipped or could not complete.
 # Inputs (env vars): GH_TOKEN, REPO, HEAD_SHA, CHECK_NAME, RUN_URL
 # Arg $1: reason — "too-large" | "no-files" | "action-error" (default)
 
 REASON="${1:-action-error}"
+TEXT="The review could not complete. This does not indicate the code is good or bad."
 case "$REASON" in
   too-large)
     TITLE="PR too large to review"
     SUMMARY="This PR exceeds the size limit for automated review." ;;
   no-files)
     TITLE="Nothing to review"
-    SUMMARY="No changed files are left to review after exclude-paths." ;;
+    SUMMARY="No changed files to review."
+    TEXT="Every changed file matches exclude-paths, or the PR has no changed files." ;;
   *)
     TITLE="Review could not complete"
     SUMMARY="The code review encountered an error. See the workflow run for details." ;;
@@ -24,6 +26,7 @@ jq -n \
   --arg title "$TITLE" \
   --arg summary "$SUMMARY" \
   --arg run_url "${RUN_URL:-}" \
+  --arg text "$TEXT" \
   '{
     "name": $name,
     "head_sha": $sha,
@@ -32,7 +35,7 @@ jq -n \
     "output": {
       "title": $title,
       "summary": ($summary + (if $run_url != "" then "\n\n[View workflow run](\($run_url))" else "" end)),
-      "text": "The review could not complete. This does not indicate the code is good or bad."
+      "text": $text
     }
   }' > /tmp/check-run-failure-payload.json
 
@@ -40,4 +43,4 @@ gh api "repos/${REPO:?REPO env var required}/check-runs" \
   --method POST --input /tmp/check-run-failure-payload.json > /dev/null \
   || echo "::warning::Failed to post neutral check run (${REASON}) — consumer may lack checks:write"
 
-echo "::warning::Review could not complete — posted neutral check run (${REASON})"
+echo "::warning::${TITLE} — posted neutral check run (${REASON})"

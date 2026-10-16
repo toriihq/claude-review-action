@@ -59,21 +59,24 @@ EXCLUDED_NOTE=""
 echo "file_count=$FILE_COUNT" >> "$GITHUB_OUTPUT"
 echo "changed_lines=$CHANGED_LINES" >> "$GITHUB_OUTPUT"
 
+# Arg $1: reason for post-review-failure-check.sh
+skip() {
+  echo "skip_reason=$1" >> "$GITHUB_OUTPUT"
+  echo "skipped=true" >> "$GITHUB_OUTPUT"
+  exit 0
+}
 skip_too_large() {
   gh pr comment "$PR_NUMBER" --repo "$REPO" \
     --body "⚠️ PR too large for automated review ($1${EXCLUDED_NOTE}, limit: $2). Please split into smaller PRs or review manually." || true
   echo "::notice::Review skipped — PR has $1 (limit: $2)"
-  echo "skipped=true" >> "$GITHUB_OUTPUT"
-  exit 0
+  skip too-large
 }
 if [ "$FILE_COUNT" -le 0 ]; then
-  echo "::notice::Review skipped — no files left to review ($EXCLUDED_COUNT excluded)"
-  echo "skip_reason=no-files" >> "$GITHUB_OUTPUT"
-  echo "skipped=true" >> "$GITHUB_OUTPUT"
-  exit 0
+  echo "::notice::Review skipped — no changed files to review${EXCLUDED_NOTE}"
+  skip no-files
 fi
 if [ -n "$MAX_FILES" ] && [ "$FILE_COUNT" -gt "$MAX_FILES" ]; then skip_too_large "$FILE_COUNT files" "$MAX_FILES"; fi
-if [ -n "${MAX_CHANGED_LINES:-}" ] && [ "$CHANGED_LINES" -gt "$MAX_CHANGED_LINES" ]; then
+if [ -n "$MAX_CHANGED_LINES" ] && [ "$CHANGED_LINES" -gt "$MAX_CHANGED_LINES" ]; then
   skip_too_large "$CHANGED_LINES changed lines" "$MAX_CHANGED_LINES"
 fi
 
@@ -84,13 +87,12 @@ if ! gh pr diff "$PR_NUMBER" --repo "$REPO" > /tmp/pr-diff.txt 2>/tmp/diff-error
     gh pr comment "$PR_NUMBER" --repo "$REPO" \
       --body "⚠️ **Claude review skipped** — PR diff exceeds GitHub's 20,000-line API limit. Please split into smaller PRs or review manually." || true
     echo "::error::Review skipped — PR diff too large for GitHub API (HTTP 406)"
-  else
-    gh pr comment "$PR_NUMBER" --repo "$REPO" \
-      --body "⚠️ **Claude review failed** — could not fetch PR diff. Error: \`${DIFF_ERROR}\`" || true
-    echo "::error::Failed to fetch PR diff: $DIFF_ERROR"
+    skip too-large
   fi
-  echo "skipped=true" >> "$GITHUB_OUTPUT"
-  exit 0
+  gh pr comment "$PR_NUMBER" --repo "$REPO" \
+    --body "⚠️ **Claude review failed** — could not fetch PR diff. Error: \`${DIFF_ERROR}\`" || true
+  echo "::error::Failed to fetch PR diff: $DIFF_ERROR"
+  skip action-error
 fi
 
 # Drop excluded files before truncation so they don't use the diff budget

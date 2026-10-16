@@ -60,7 +60,7 @@ cat > "$T/bin/gh" <<GH
 case "\$1 \$2" in
   "pr view") [[ "\$*" == *"--json changedFiles,additions,deletions"* ]] && cat "$T/size" ;;
   "api --paginate") echo "listed files" >> "$T/gh.log"; cat "$T/files.tsv" ;;
-  "pr diff") cat "$T/diff" ;;
+  "pr diff") [ -s "$T/diff-error" ] && { cat "$T/diff-error" >&2; exit 1; }; cat "$T/diff" ;;
   "pr comment") echo "\$*" >> "$T/gh.log" ;;
 esac
 GH
@@ -107,7 +107,8 @@ grep -q '^missing_file_count=4$' "$T/out" || { echo "FAIL excluded + truncated c
 
 # max-changed-lines: skips over the limit; excluded files don't count toward it
 capture MAX_CHANGED_LINES=11
-grep -q '^skipped=true$' "$T/out" && grep -q '12 changed lines' "$T/gh.log" || { echo "FAIL line limit not enforced"; exit 1; }
+grep -q '^skipped=true$' "$T/out" && grep -q '^skip_reason=too-large$' "$T/out" && grep -q '12 changed lines' "$T/gh.log" \
+  || { echo "FAIL line limit not enforced"; exit 1; }
 capture MAX_CHANGED_LINES=11 EXCLUDE_PATHS=gone.ts
 grep -q '^skipped=true$' "$T/out" && { echo "FAIL excluded lines counted"; exit 1; }
 
@@ -116,9 +117,20 @@ capture EXCLUDE_PATHS='*'
 grep -q '^skipped=true$' "$T/out" && grep -q '^skip_reason=no-files$' "$T/out" && ! grep -q 'pr comment\|too large' "$T/gh.log" \
   || { echo "FAIL all excluded"; cat "$T/out" "$T/gh.log"; exit 1; }
 
+# Diff fetch failures: GitHub's size cap is too-large, anything else is an action error
+echo "HTTP 406: too_large" > "$T/diff-error"; capture
+grep -q '^skip_reason=too-large$' "$T/out" || { echo "FAIL diff 406 reason"; cat "$T/out"; exit 1; }
+echo "HTTP 502" > "$T/diff-error"; capture
+grep -q '^skip_reason=action-error$' "$T/out" && grep -q 'could not fetch PR diff' "$T/gh.log" || { echo "FAIL diff error reason"; cat "$T/out"; exit 1; }
+: > "$T/diff-error"
+
 # Empty max-files means no limit, without a failed comparison
 capture MAX_FILES= 2> "$T/err"
 ! grep -q '^skipped=true$' "$T/out" && [ ! -s "$T/err" ] || { echo "FAIL empty max-files"; cat "$T/err"; exit 1; }
+
+# A PR with no changed files is skipped too, without exclude-paths
+echo "0 0" > "$T/size"; capture
+grep -q '^skip_reason=no-files$' "$T/out" || { echo "FAIL empty PR"; cat "$T/out"; exit 1; }
 
 # Over 100 files are counted (gh pr view --json files stops at 100)
 echo "150 150" > "$T/size"

@@ -38,6 +38,7 @@ esac
 # Size limits must be whole numbers, so a typo like '5k' can't switch a limit off
 for INPUT in max-files max-changed-lines approve-max-files approve-max-changed-lines; do
   VAR=$(echo "$INPUT" | tr 'a-z-' 'A-Z_')
+  [ -n "${!VAR+x}" ] || { echo "::error::${INPUT} is not passed to validate-inputs.sh (set ${VAR} in action.yml)"; exit 1; }
   VALUE="${!VAR}"
   [[ -z "$VALUE" || "$VALUE" =~ ^[0-9]+$ ]] && continue
   post_error "$(cat <<MSG
