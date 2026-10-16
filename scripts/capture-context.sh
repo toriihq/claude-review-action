@@ -55,7 +55,8 @@ if [ ${#EXCLUDE_PATTERNS[@]} -gt 0 ]; then
 fi
 EXCLUDED_COUNT=$(wc -l < /tmp/excluded-files.txt | tr -d ' ')
 EXCLUDED_NOTE=""
-[ "$EXCLUDED_COUNT" -gt 0 ] && EXCLUDED_NOTE=", not counting $EXCLUDED_COUNT excluded files"
+[ "$EXCLUDED_COUNT" = 1 ] && EXCLUDED_NOTE=", not counting 1 excluded file"
+[ "$EXCLUDED_COUNT" -gt 1 ] && EXCLUDED_NOTE=", not counting $EXCLUDED_COUNT excluded files"
 echo "file_count=$FILE_COUNT" >> "$GITHUB_OUTPUT"
 echo "changed_lines=$CHANGED_LINES" >> "$GITHUB_OUTPUT"
 
