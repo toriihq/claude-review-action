@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.0] - 2026-10-16
+
+### Added
+- `exclude-paths`: bash patterns, one per line (`*` also matches `/`). Matching files (lockfiles, generated code, translations) are removed from the diff before truncation, not counted by any size limit, and listed in the prompt as not to be reviewed.
+- `max-changed-lines`: skip the review above N additions + deletions. Works alongside `max-files`.
+- `approve-max-changed-lines`: with `full` authority, bigger PRs are still reviewed but get COMMENT instead of APPROVE.
+- When no changed files are left to review (all excluded, or an empty PR), the review is skipped with a neutral "Nothing to review" check run.
+
+### Changed
+- `approve-max-files` is enforced in shell (a hard "MUST NOT APPROVE" line in the prompt) instead of asking Claude to count files. With the default of 50, PRs with more files get COMMENT, never APPROVE.
+- `max-files`, `max-changed-lines`, `approve-max-files` and `approve-max-changed-lines` must be whole numbers or empty; anything else fails the run with a PR comment, so a typo like `'5k'` can't switch a limit off.
+- A diff fetch that fails for a reason other than GitHub's size cap is reported as "Review could not complete", not "PR too large".
+
+### Fixed
+- PRs with more than 100 files were counted as 100, so `max-files` above 100 never triggered. Files are now counted with `changedFiles`.
+
 ## [1.2.2] - 2026-10-07
 
 ### Fixed
