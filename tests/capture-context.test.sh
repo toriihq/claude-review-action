@@ -111,6 +111,15 @@ grep -q '^skipped=true$' "$T/out" && grep -q '12 changed lines' "$T/gh.log" || {
 capture MAX_CHANGED_LINES=11 EXCLUDE_PATHS=gone.ts
 grep -q '^skipped=true$' "$T/out" && { echo "FAIL excluded lines counted"; exit 1; }
 
+# Every file excluded: skipped quietly with its own reason, no PR comment
+capture EXCLUDE_PATHS='*'
+grep -q '^skipped=true$' "$T/out" && grep -q '^skip_reason=no-files$' "$T/out" && ! grep -q 'pr comment\|too large' "$T/gh.log" \
+  || { echo "FAIL all excluded"; cat "$T/out" "$T/gh.log"; exit 1; }
+
+# Empty max-files means no limit, without a failed comparison
+capture MAX_FILES= 2> "$T/err"
+! grep -q '^skipped=true$' "$T/out" && [ ! -s "$T/err" ] || { echo "FAIL empty max-files"; cat "$T/err"; exit 1; }
+
 # Over 100 files are counted (gh pr view --json files stops at 100)
 echo "150 150" > "$T/size"
 capture MAX_FILES=120
@@ -135,4 +144,24 @@ printf '%s\t%s\n' 2 'we"ird.ts' 2 ok.ts > "$T/files.tsv"; echo "2 4" > "$T/size"
 capture EXCLUDE_PATHS='we"ird.ts'
 grep -q '^file_count=1$' "$T/out" && ! grep -q 'ird' /tmp/pr-diff.txt && grep -q '^+O$' /tmp/pr-diff.txt \
   || { echo "FAIL quote in path"; cat /tmp/pr-diff.txt; exit 1; }
+
+# A backslash before digits: git writes it as \\, which isn't an octal escape
+cat > "$T/diff" <<'DIFF'
+diff --git "a/a\\123.ts" "b/a\\123.ts"
+--- "a/a\\123.ts"
++++ "b/a\\123.ts"
+@@ -1 +1 @@
+-b
++B
+diff --git a/ok.ts b/ok.ts
+--- a/ok.ts
++++ b/ok.ts
+@@ -1 +1 @@
+-o
++O
+DIFF
+printf '%s\t%s\n' 2 'a\123.ts' 2 ok.ts > "$T/files.tsv"
+capture EXCLUDE_PATHS='a?123.ts'
+grep -q '^file_count=1$' "$T/out" && ! grep -q '123' /tmp/pr-diff.txt && grep -q '^+O$' /tmp/pr-diff.txt \
+  || { echo "FAIL backslash in path"; cat /tmp/pr-diff.txt; exit 1; }
 echo PASS

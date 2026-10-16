@@ -38,7 +38,7 @@ esac
 # Size limits must be whole numbers, so a typo like '5k' can't switch a limit off
 for INPUT in max-files max-changed-lines approve-max-files approve-max-changed-lines; do
   VAR=$(echo "$INPUT" | tr 'a-z-' 'A-Z_')
-  VALUE="${!VAR:-}"
+  VALUE="${!VAR}"
   [[ -z "$VALUE" || "$VALUE" =~ ^[0-9]+$ ]] && continue
   post_error "$(cat <<MSG
 ❌ **Claude Review failed — invalid configuration**

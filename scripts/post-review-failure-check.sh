@@ -3,13 +3,16 @@ set -euo pipefail
 
 # Post a neutral check run when the review could not complete.
 # Inputs (env vars): GH_TOKEN, REPO, HEAD_SHA, CHECK_NAME, RUN_URL
-# Arg $1: reason — "too-large" | "action-error" (default)
+# Arg $1: reason — "too-large" | "no-files" | "action-error" (default)
 
 REASON="${1:-action-error}"
 case "$REASON" in
   too-large)
     TITLE="PR too large to review"
     SUMMARY="This PR exceeds the size limit for automated review." ;;
+  no-files)
+    TITLE="Nothing to review"
+    SUMMARY="No changed files are left to review after exclude-paths." ;;
   *)
     TITLE="Review could not complete"
     SUMMARY="The code review encountered an error. See the workflow run for details." ;;

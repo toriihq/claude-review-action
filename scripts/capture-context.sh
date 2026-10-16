@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Capture PR context: size check, diff (truncated), description.
 # Inputs (env vars): GH_TOKEN, REPO, PR_NUMBER, MAX_FILES, MAX_CHANGED_LINES, EXCLUDE_PATHS, MAX_DIFF_LINES, MAX_DIFF_BYTES, INCLUDE_PR_DESCRIPTION
-# Outputs (GITHUB_OUTPUT): file_count, changed_lines, diff_truncated, missing_file_count
+# Outputs (GITHUB_OUTPUT): file_count, changed_lines, skipped, skip_reason, diff_truncated, missing_file_count
 # Outputs (files): /tmp/pr-diff.txt, /tmp/pr-description.txt, /tmp/truncated-files.txt, /tmp/excluded-files.txt, /tmp/pr-diffs/<path>.diff
 
 # Diff header -> new path (single parser). Symmetric a/X b/X first so " b/" inside X is safe; greedy for renames.
@@ -19,7 +19,9 @@ header_paths() {
 # Git C-quotes unusual paths (caf\303\251.ts, we\"ird.ts); decode to match the REST paths
 decode_path() {
   local p=${1//\\\"/\"}
-  printf '%b' "$(sed 's/\\\([0-7][0-7][0-7]\)/\\0\1/g' <<< "$p")"
+  p=${p//\\\\/$'\001'}
+  p=$(sed 's/\\\([0-7][0-7][0-7]\)/\\0\1/g' <<< "$p")
+  printf '%b' "${p//$'\001'/\\\\}"
 }
 
 # exclude-paths: one bash pattern per line, `*` also matches `/`
@@ -64,7 +66,13 @@ skip_too_large() {
   echo "skipped=true" >> "$GITHUB_OUTPUT"
   exit 0
 }
-if [ "$FILE_COUNT" -gt "$MAX_FILES" ]; then skip_too_large "$FILE_COUNT files" "$MAX_FILES"; fi
+if [ "$FILE_COUNT" -le 0 ]; then
+  echo "::notice::Review skipped — no files left to review ($EXCLUDED_COUNT excluded)"
+  echo "skip_reason=no-files" >> "$GITHUB_OUTPUT"
+  echo "skipped=true" >> "$GITHUB_OUTPUT"
+  exit 0
+fi
+if [ -n "$MAX_FILES" ] && [ "$FILE_COUNT" -gt "$MAX_FILES" ]; then skip_too_large "$FILE_COUNT files" "$MAX_FILES"; fi
 if [ -n "${MAX_CHANGED_LINES:-}" ] && [ "$CHANGED_LINES" -gt "$MAX_CHANGED_LINES" ]; then
   skip_too_large "$CHANGED_LINES changed lines" "$MAX_CHANGED_LINES"
 fi

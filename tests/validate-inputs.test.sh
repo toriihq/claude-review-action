@@ -23,4 +23,7 @@ done
 run APPROVE_MAX_CHANGED_LINES=5k && fail "approve-max-changed-lines: accepted"
 run APPROVE_MAX_FILES=abc && fail "approve-max-files: accepted"
 run MAX_FILES=abc && fail "max-files: accepted"
+env -u APPROVE_MAX_CHANGED_LINES PATH="$T/bin:$PATH" ANTHROPIC_API_KEY=k REVIEW_AUTHORITY=full REPO=x PR_NUMBER=1 \
+  MAX_FILES=50 MAX_CHANGED_LINES= APPROVE_MAX_FILES=50 bash scripts/validate-inputs.sh > /dev/null 2>&1 \
+  && fail "limit not passed to the step: accepted"
 echo PASS
