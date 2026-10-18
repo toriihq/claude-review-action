@@ -88,9 +88,9 @@ inputs:
     required: false
     default: 'strict'
   approve-max-files:
-    description: 'For full mode: only approve PRs with <= N files'
+    description: 'For full mode: only approve PRs with <= N files. Empty = no limit'
     required: false
-    default: '50'
+    default: ''
   approve-max-changed-lines:
     description: 'For full mode: only approve PRs with <= N changed lines. Empty = no limit'
     required: false

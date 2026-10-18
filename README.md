@@ -211,7 +211,7 @@ max-changed-lines: '5000'
 |-------|---------|-------------|
 | `review-authority` | `request-changes` | `comment-only`, `request-changes`, or `full` |
 | `approve-threshold` | `strict` | For `full`: `strict` (zero MEDIUM+) or `normal` (zero HIGH+) |
-| `approve-max-files` | `50` | For `full`: only approve PRs with <= N files |
+| `approve-max-files` | `""` | For `full`: only approve PRs with <= N files. Empty = no limit |
 | `approve-max-changed-lines` | `""` | For `full`: only approve PRs with <= N changed lines. Empty = no limit |
 
 **Authority levels:**
@@ -220,7 +220,7 @@ max-changed-lines: '5000'
 |-------|-----------|-------------|----------|
 | `comment-only` | No | No | Advisory only — never blocks PRs |
 | `request-changes` | Yes | No | Blocks on blockers/high. **Default.** |
-| `full` | Yes | Yes (guarded) | Can also APPROVE clean PRs, gated by threshold + file count |
+| `full` | Yes | Yes (guarded) | Can also APPROVE clean PRs, gated by the threshold, and by file or line caps when those inputs are set |
 
 ### Triggers
 
