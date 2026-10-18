@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Changed
-- `approve-max-files` defaults to empty (no limit). 1.3.0 hard-enforced the old default of 50, so a `full` review of any PR with more than 50 files posted COMMENT even when `max-files` was raised. Set `approve-max-files: '50'` to keep the old cap.
+- `approve-max-files` default raised from 50 to 200. 1.3.0 hard-enforced the old default, so a `full` review of any PR with more than 50 files posted COMMENT even when `max-files` was raised. Set `approve-max-files: '50'` to keep the old cap, or empty for no cap.
 
 ## [1.3.0] - 2026-10-16
 

@@ -63,5 +63,7 @@ REVIEW_AUTHORITY=full FILE_COUNT=40 APPROVE_MAX_FILES=50 run 120000 || fail "app
 grep -q 'MUST NOT APPROVE' /tmp/claude-prompt.md && fail "approve files: under the limit but approval blocked"
 REVIEW_AUTHORITY=full FILE_COUNT=69 APPROVE_MAX_FILES= run 120000 || fail "approve files unset: exit"
 grep -q 'MUST NOT APPROVE' /tmp/claude-prompt.md && fail "approve files: blocked with no limit set"
-grep -A4 '^  approve-max-files:' action.yml | grep -qx "    default: ''" || fail "approve-max-files default is not empty"
+REVIEW_AUTHORITY=full FILE_COUNT=201 APPROVE_MAX_FILES=200 run 120000 || fail "approve files default: exit"
+grep -q 'This PR has 201 files (approval limit: 200)' /tmp/claude-prompt.md || fail "approve files default: over 200 but approval allowed"
+grep -A4 '^  approve-max-files:' action.yml | grep -qx "    default: '200'" || fail "approve-max-files default is not 200"
 echo PASS
